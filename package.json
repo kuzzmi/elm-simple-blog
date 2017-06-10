@@ -1,0 +1,21 @@
+{
+  "name": "elm-simle-blog",
+  "version": "1.0.0",
+  "main": "elm.js",
+  "repository": "git@github.com:kuzzmi/elm-simple-blog.git",
+  "author": "Igor Kuzmenko <igor@kuzzmi.com>",
+  "license": "MIT",
+  "dependencies": {
+    "css-loader": "^0.28.4",
+    "elm-webpack-loader": "^4.3.1",
+    "normalize.css": "^7.0.0",
+    "style-loader": "^0.18.2",
+    "webpack": "^2.6.1",
+    "webpack-dev-server": "^2.4.5"
+  },
+  "scripts": {
+    "build": "webpack",
+    "watch": "webpack --watch",
+    "dev": "webpack-dev-server --port 8000"
+  }
+}
