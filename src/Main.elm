@@ -1,25 +1,31 @@
-module Main exposing (..)
+port module Main exposing (..)
 
 import Html
 import Color
-import Date
 import Element exposing (..)
+import Element.Events exposing (..)
 import Element.Attributes exposing (..)
-import Html.Events exposing (..)
 import Html.Attributes
 import Http
 import Json.Encode as Encode
 import Json.Decode as Decode
-import Json.Decode.Pipeline as Pipeline exposing (decode, required, custom, hardcoded)
+import Json.Decode.Pipeline as Pipeline exposing (decode, required)
 import Style exposing (..)
 import Style.Font as Font
 import Style.Color as Color
 import Navigation
-import UrlParser exposing (Parser, (</>), s, int, string, oneOf, parseHash)
+import UrlParser exposing (Parser, (</>), s, int, string, oneOf, parsePath)
+import Date
 import Date.Extra as Date
+import MD5
+import Dom.Scroll
+import Task
+import Debug
 
 
--- import Html.Attributes exposing (..)
+{-| This is used to update page identificator of the page for disqus
+-}
+port setDisqusIdentifier : Slug -> Cmd msg
 
 
 main =
@@ -35,43 +41,87 @@ type Styles
     = None
     | Main
     | PostTitle
-    | Footer
     | Logo
     | NavOption
     | TagStyle
     | ButtonStyle
+    | Footer
+    | FooterLogo
+    | FooterHeart
 
 
-stylesheet : StyleSheet Styles variation
+type Variations
+    = Active
+
+
+darkGrey : Color.Color
+darkGrey =
+    Color.rgb 50 50 50
+
+
+orange : Color.Color
+orange =
+    Color.rgb 255 131 0
+
+
+stylesheet : StyleSheet Styles Variations
 stylesheet =
     Style.stylesheet
         [ style None []
         , style Main
             [ Font.typeface [ "Overpass", "monospace" ]
             , Font.lineHeight 2
+            , Color.text darkGrey
             ]
         , style PostTitle
             [ Font.size 32
             , Font.weight 700
+            , Color.text darkGrey
+            , hover
+                [ Font.underline
+                ]
             ]
         , style Logo
             [ Font.size 26
             , Font.weight 600
-            , Color.text (Color.rgb 255 131 0)
-            , Color.decoration (Color.rgb 255 131 0)
+            , Color.text orange
+            , hover
+                [ Font.underline
+                ]
             ]
         , style NavOption
             [ Font.size 26
             , Font.weight 600
+            , Color.text darkGrey
+            , hover
+                [ Font.underline
+                ]
+            , variation Active
+                [ Color.text Color.white
+                , Color.background darkGrey
+                ]
             ]
         , style TagStyle
             [ Color.text (Color.rgb 120 120 120)
             , Color.background (Color.rgb 242 242 242)
             ]
         , style ButtonStyle
-            [ Font.typeface [ "Overpass", "monospace" ]
+            [ Color.text darkGrey
+            , Color.background (Color.rgb 242 242 242)
+            , hover
+                [ Color.text orange
+                ]
             ]
         , style Footer []
+        , style FooterHeart
+            [ Color.text (Color.rgb 255 0 0)
+            ]
+        , style FooterLogo
+            [ Color.text orange
+            , hover
+                [ Font.underline
+                ]
+            ]
         ]
 
 
@@ -95,6 +145,10 @@ type alias Tag =
     }
 
 
+type alias Slug =
+    String
+
+
 type alias Model =
     { posts : List Post
     , currentRoute : Maybe Route
@@ -104,7 +158,7 @@ type alias Model =
 init : Navigation.Location -> ( Model, Cmd Msg )
 init location =
     ( { posts = []
-      , currentRoute = parseHash route location
+      , currentRoute = parsePath routeParser location
       }
     , getPosts
     )
@@ -117,11 +171,19 @@ init location =
 type Msg
     = LoadPosts (Result Http.Error (List Post))
     | UrlChange Navigation.Location
+    | ChangeRoute Route
+    | DoNothing String
+
+
+scrollToTopCmd : Cmd Msg
+scrollToTopCmd =
+    Dom.Scroll.toTop "body"
+        |> Task.attempt (always (DoNothing ""))
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case msg of
+    case Debug.log "message" msg of
         LoadPosts (Ok posts) ->
             ( { model | posts = posts }, Cmd.none )
 
@@ -129,9 +191,17 @@ update msg model =
             ( model, Cmd.none )
 
         UrlChange location ->
-            ( { model | currentRoute = parseHash route location }
-            , Cmd.none
+            ( { model | currentRoute = parsePath routeParser location }
+            , Cmd.batch [ setDisqusIdentifier "test", scrollToTopCmd ]
             )
+
+        ChangeRoute route ->
+            ( model
+            , Cmd.batch [ scrollToTopCmd, routeToPath route |> Navigation.newUrl ]
+            )
+
+        DoNothing _ ->
+            ( model, Cmd.none )
 
 
 
@@ -140,20 +210,67 @@ update msg model =
 
 type Route
     = BlogRoute
-    | PostRoute String
+    | PostRoute Slug
+    | PostEditRoute Slug
     | AboutRoute
 
 
-route : Parser (Route -> a) a
-route =
+routeParser : Parser (Route -> a) a
+routeParser =
     oneOf
-        [ UrlParser.map PostRoute (s "blog" </> string)
+        [ UrlParser.map BlogRoute (s "blog")
+        , UrlParser.map PostRoute (s "blog" </> string)
+        , UrlParser.map PostEditRoute (s "blog" </> string </> s "edit")
         , UrlParser.map AboutRoute (s "about")
         ]
 
 
+routeToPath : Route -> String
+routeToPath route =
+    case route of
+        BlogRoute ->
+            "/blog"
 
--- VIEW
+        PostRoute slug ->
+            "/blog/" ++ slug
+
+        PostEditRoute slug ->
+            "/blog/" ++ slug ++ "/edit"
+
+        AboutRoute ->
+            "/about"
+
+
+isRouteActive : Maybe Route -> Route -> Bool
+isRouteActive route parentRoute =
+    case ( route, parentRoute ) of
+        ( Nothing, BlogRoute ) ->
+            True
+
+        ( Just BlogRoute, BlogRoute ) ->
+            True
+
+        ( Just (PostRoute _), PostRoute _ ) ->
+            True
+
+        ( Just (PostRoute _), BlogRoute ) ->
+            True
+
+        ( Just (PostEditRoute _), PostRoute _ ) ->
+            True
+
+        ( Just (PostEditRoute _), BlogRoute ) ->
+            True
+
+        ( Just AboutRoute, AboutRoute ) ->
+            True
+
+        ( _, _ ) ->
+            False
+
+
+
+-- MAIN VIEW
 
 
 view : Model -> Html.Html Msg
@@ -162,7 +279,7 @@ view model =
         []
         [ column Main
             [ center, width (px 800) ]
-            [ viewHeader
+            [ viewHeader model.currentRoute
             , column None
                 [ spacing 100 ]
                 (viewContent model)
@@ -172,18 +289,22 @@ view model =
         |> Element.root stylesheet
 
 
-viewContent : Model -> List (Element Styles variation msg)
+getPostBySlug : String -> List Post -> Maybe Post
+getPostBySlug slug posts =
+    List.filter (\post -> post.slug == slug) posts |> List.head
+
+
+viewContent : Model -> List (Element Styles Variations Msg)
 viewContent model =
     case model.currentRoute of
         Just BlogRoute ->
             viewPostsList model.posts
 
         Just (PostRoute slug) ->
-            let
-                post =
-                    List.filter (\post -> post.slug == slug) model.posts |> List.head
-            in
-                [ viewPost post ]
+            [ getPostBySlug slug model.posts |> viewPost ]
+
+        Just (PostEditRoute slug) ->
+            [ getPostBySlug slug model.posts |> viewPost ]
 
         Just AboutRoute ->
             [ viewAbout ]
@@ -192,7 +313,11 @@ viewContent model =
             viewPostsList model.posts
 
 
-viewPost : Maybe Post -> Element Styles variation msg
+
+-- POST VIEWS
+
+
+viewPost : Maybe Post -> Element Styles Variations Msg
 viewPost post =
     case post of
         Just post ->
@@ -201,10 +326,11 @@ viewPost post =
                 [ viewPostMeta post
                 , paragraph PostTitle [] [ text post.title ]
                 , el None
-                    [ width (px 800) ]
+                    [ width (px 800), class "post-body" ]
                     (viewPostBody post.body |> html)
                 , viewTags post.tags
                 ]
+                |> article
 
         Nothing ->
             column None
@@ -212,7 +338,7 @@ viewPost post =
                 [ paragraph PostTitle [] [ text "Nothing found" ] ]
 
 
-viewPostStatus : Bool -> Element Styles variation message
+viewPostStatus : Bool -> Element Styles Variations Msg
 viewPostStatus isPublished =
     let
         status =
@@ -224,7 +350,11 @@ viewPostStatus isPublished =
         el None [] (text ("[" ++ status ++ "]"))
 
 
-viewPostMeta : Post -> Element Styles variation message
+viewLink style attributes label route =
+    el style ((onClick (ChangeRoute route)) :: attributes) (text label) |> node "a"
+
+
+viewPostMeta : Post -> Element Styles Variations Msg
 viewPostMeta post =
     row None
         [ justify ]
@@ -235,34 +365,34 @@ viewPostMeta post =
             ]
         , row None
             [ spacing 10 ]
-            [ el ButtonStyle [] (text "edit") |> button
-            , el ButtonStyle [] (text "delete") |> button
+            [ viewLink ButtonStyle [ paddingXY 10 0 ] "edit" (PostEditRoute post.slug)
+            , viewLink ButtonStyle [ paddingXY 10 0 ] "delete" (PostEditRoute post.slug)
             ]
         ]
 
 
-viewPostsList : List Post -> List (Element Styles variation msg)
+viewPostsListItem : Post -> Element Styles Variations Msg
+viewPostsListItem post =
+    column None
+        [ spacing 5 ]
+        [ viewPostMeta post
+        , el PostTitle [ onClick (PostRoute post.slug |> ChangeRoute) ] (text post.title)
+        , paragraph None [] [ text post.description ]
+        , viewTags post.tags
+        ]
+
+
+viewPostsList : List Post -> List (Element Styles Variations Msg)
 viewPostsList posts =
-    (List.map
-        (\post ->
-            column None
-                [ spacing 5 ]
-                [ viewPostMeta post
-                , paragraph PostTitle [] [ text post.title |> link ("#/blog/" ++ post.slug) ]
-                , paragraph None [] [ text post.description ]
-                , viewTags post.tags
-                ]
-        )
-        posts
-    )
+    List.map viewPostsListItem posts
 
 
-viewTag : Tag -> Element Styles variation msg
+viewTag : Tag -> Element Styles Variations Msg
 viewTag tag =
-    el TagStyle [ paddingLeft 10, paddingRight 10 ] (text tag.name)
+    el TagStyle [ paddingXY 10 0 ] (text tag.name)
 
 
-viewTags : List Tag -> Element Styles variation msg
+viewTags : List Tag -> Element Styles Variations Msg
 viewTags tags =
     row None [ spacing 10 ] (List.map viewTag tags)
 
@@ -274,28 +404,57 @@ viewPostBody body =
     Html.div [ (Html.Attributes.property "innerHTML" (Encode.string body)) ] []
 
 
-viewAbout : Element Styles variation msg
+
+-- ABOUT ROUTE
+
+
+viewGravatar : String -> Element Styles Variations msg
+viewGravatar email =
+    let
+        gravatarUrl =
+            "https://www.gravatar.com/avatar/"
+
+        gravatarHash =
+            MD5.hex email
+
+        gravatarOptions =
+            "?s=200"
+
+        imageUrl =
+            gravatarUrl ++ gravatarHash ++ gravatarOptions
+    in
+        image imageUrl None [] (text "My Photo")
+
+
+viewAbout : Element Styles Variations msg
 viewAbout =
     column None
         [ spacing 10 ]
-        [ paragraph PostTitle [] [ text "Hello" ]
+        [ viewGravatar "kuzzmi@gmail.com"
+        , el None [] (text "Hello, my name is Igor. I love my wife, JavaScript, and Vim.")
         ]
 
 
-viewHeader : Element Styles variation msg
-viewHeader =
-    el None [ justify ] <|
-        row None
-            [ paddingTop 80, paddingBottom 80, spacing 80 ]
-            [ el Logo [] (text "igor kuzmenko" |> link "#")
-            , row None
-                [ spacing 40 ]
-                [ el NavOption [] (text "blog" |> link "#")
-                , el NavOption [] (text "projects" |> link "#/projects")
-                , el NavOption [] (text "about" |> link "#/about")
+viewHeader : Maybe Route -> Element Styles Variations Msg
+viewHeader currentRoute =
+    let
+        isActive route =
+            isRouteActive currentRoute route
+
+        navLink label route =
+            viewLink NavOption [ vary Active (isActive route), paddingXY 15 0 ] label route
+    in
+        el None [ justify ] <|
+            row None
+                [ paddingTop 80, paddingBottom 80, spacing 40 ]
+                [ el Logo [ onClick (ChangeRoute BlogRoute) ] (text "igor kuzmenko_")
+                , row None
+                    [ spacing 40 ]
+                    [ navLink "blog" BlogRoute
+                    , navLink "about" AboutRoute
+                    ]
+                , el NavOption [] (text "rss") |> link "http://feeds.feedburner.com/kuzzmi"
                 ]
-            , el NavOption [] (text "rss" |> link "http://feeds.feedburner.com/kuzzmi")
-            ]
 
 
 viewFooter : Element Styles variation msg
@@ -303,10 +462,12 @@ viewFooter =
     el None [] <|
         row Footer
             [ paddingTop 80, paddingBottom 80 ]
-            [ paragraph None
-                []
-                [ text "Built with ♥ by "
-                , text "@kuzzmi" |> link "https://twitter.com/kuzzmi"
+            [ row None
+                [ spacing 10 ]
+                [ el None [] (text "Built with")
+                , el FooterHeart [] (text "♥")
+                , el None [] (text "by")
+                , el FooterLogo [] (text "@kuzzmi") |> link "https://twitter.com/kuzzmi"
                 ]
             ]
 
