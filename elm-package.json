@@ -16,6 +16,7 @@
         "elm-lang/navigation": "2.1.0 <= v < 3.0.0",
         "evancz/url-parser": "2.0.1 <= v < 3.0.0",
         "justinmimbs/elm-date-extra": "2.0.3 <= v < 3.0.0",
+        "kuzzmi/elm-gravatar": "1.0.0 <= v < 2.0.0",
         "mdgriffith/style-elements": "3.0.0 <= v < 4.0.0",
         "sanichi/elm-md5": "1.0.6 <= v < 2.0.0"
     },
