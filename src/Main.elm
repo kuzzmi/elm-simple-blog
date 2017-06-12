@@ -1,4 +1,4 @@
-port module Main exposing (..)
+port module Main exposing (main, setDisqusIdentifier)
 
 import Html
 import Color
@@ -56,7 +56,12 @@ type Variations
 
 darkGrey : Color.Color
 darkGrey =
-    Color.rgb 50 50 50
+    Color.rgb 57 57 57
+
+
+lightGrey : Color.Color
+lightGrey =
+    Color.rgb 204 204 204
 
 
 orange : Color.Color
@@ -77,6 +82,7 @@ stylesheet =
             [ Font.size 32
             , Font.weight 700
             , Color.text darkGrey
+            , Style.cursor "pointer"
             , hover
                 [ Font.underline
                 ]
@@ -93,6 +99,7 @@ stylesheet =
             [ Font.size 26
             , Font.weight 600
             , Color.text darkGrey
+            , Style.cursor "pointer"
             , hover
                 [ Font.underline
                 ]
@@ -108,6 +115,7 @@ stylesheet =
         , style ButtonStyle
             [ Color.text darkGrey
             , Color.background (Color.rgb 242 242 242)
+            , Style.cursor "pointer"
             , hover
                 [ Color.text orange
                 ]
@@ -185,7 +193,7 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case Debug.log "message" msg of
         LoadPosts (Ok posts) ->
-            ( { model | posts = posts }, Cmd.none )
+            ( { model | posts = posts }, setDisqusIdentifier "test" )
 
         LoadPosts (Err _) ->
             ( model, Cmd.none )

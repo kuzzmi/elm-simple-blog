@@ -2,7 +2,7 @@ require('normalize.css');
 require('./style.scss');
 
 var hljs = require('highlight.js');
-require('highlight.js/styles/monokai.css');
+require('highlight.js/styles/tomorrow-night-eighties.css');
 
 var Elm = require('./Main');
 
@@ -22,7 +22,10 @@ var app = Elm.Main.embed(document.getElementById('root'));
 //
 //
 app.ports.setDisqusIdentifier.subscribe(function(slug) {
-    document.querySelectorAll('pre code').forEach(function(block) {
-        hljs.highlightBlock(block);
-    });
+    console.log('PORT FIRED');
+    setTimeout(function() {
+        document.querySelectorAll('pre code').forEach(function(block) {
+            hljs.highlightBlock(block);
+        });
+    }, 100);
 });

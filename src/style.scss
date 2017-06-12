@@ -7,12 +7,18 @@
         padding-bottom: 10px;
     }
 
+
+    pre code {
+        margin: 10px 0;
+        padding: 20px;
+    }
+
     code {
         font-size: 14px;
-        padding: 4px 8px;
+        padding: 7px 10px;
         border-radius: 2px;
-        background: rgb(240, 240, 240);
-        color: rgb(40, 40, 40);
+        color: rgb(204, 204, 204);
+        background: rgb(57, 57, 57);
     }
 
 
