@@ -20,6 +20,14 @@ module.exports = {
         loader: 'elm-webpack-loader'
       },
       {
+        test: /\.scss/,
+        use: [
+            'style-loader',
+            'css-loader',
+            'sass-loader'
+        ]
+      },
+      {
         test: /\.css/,
         use: [
             'style-loader',
@@ -35,6 +43,7 @@ module.exports = {
     inline: true,
     stats: 'errors-only',
     publicPath: '/',
-    contentBase: path.join(__dirname, './src')
+    contentBase: path.join(__dirname, './src'),
+    historyApiFallback: true
   }
 };
