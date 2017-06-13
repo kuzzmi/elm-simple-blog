@@ -55,6 +55,21 @@ type alias Post =
     }
 
 
+emptyPost : Maybe Post
+emptyPost =
+    Just
+        { id = ""
+        , title = ""
+        , body = ""
+        , markdown = ""
+        , dateCreated = Date.fromTime 0
+        , isPublished = False
+        , slug = ""
+        , description = ""
+        , tags = []
+        }
+
+
 type alias Tag =
     { id : ID
     , name : String
@@ -68,6 +83,7 @@ type alias Slug =
 type alias Model =
     { posts : List Post
     , tags : List Tag
+    , post : Maybe Post
     , currentRoute : Maybe Route
     }
 
@@ -76,6 +92,7 @@ init : Navigation.Location -> ( Model, Cmd Msg )
 init location =
     ( { posts = []
       , tags = []
+      , post = Nothing
       , currentRoute = parsePath routeParser location
       }
     , Cmd.batch [ getPosts, getTags ]
@@ -89,7 +106,9 @@ init location =
 type Msg
     = LoadPosts (Result Http.Error (List Post))
     | LoadTags (Result Http.Error (List Tag))
+    | PostSaveOrCreate Post
     | UrlChange Navigation.Location
+    | Update Post
     | ChangeRoute Route
     | DoNothing String
 
@@ -98,6 +117,11 @@ scrollToTopCmd : Cmd Msg
 scrollToTopCmd =
     Dom.Scroll.toTop "body"
         |> Task.attempt (always (DoNothing ""))
+
+
+navigateToRoute : Route -> Cmd Msg
+navigateToRoute route =
+    routeToPath route |> Navigation.newUrl
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -120,10 +144,28 @@ update msg model =
             , Cmd.batch [ setDisqusIdentifier "test", scrollToTopCmd ]
             )
 
+        Update post ->
+            ( { model | post = Just post }, Cmd.none )
+
         ChangeRoute route ->
-            ( model
-            , Cmd.batch [ scrollToTopCmd, routeToPath route |> Navigation.newUrl ]
-            )
+            let
+                scrollAndGo =
+                    Cmd.batch [ scrollToTopCmd, navigateToRoute route ]
+            in
+                case route of
+                    PostEditRoute slug ->
+                        ( { model | post = getPostBySlug slug model.posts }
+                        , scrollAndGo
+                        )
+
+                    PostNewRoute ->
+                        ( { model | post = emptyPost }, scrollAndGo )
+
+                    _ ->
+                        ( model, scrollAndGo )
+
+        PostSaveOrCreate post ->
+            ( model, Cmd.batch [ postPost post, navigateToRoute PostsListRoute ] )
 
         DoNothing _ ->
             ( model, Cmd.none )
@@ -137,6 +179,7 @@ type Route
     = PostsListRoute
     | PostsListByTagRoute ID
     | PostViewRoute Slug
+    | PostNewRoute
     | PostEditRoute Slug
     | AboutRoute
 
@@ -146,6 +189,7 @@ routeParser =
     oneOf
         [ UrlParser.map PostsListRoute (s "blog")
         , UrlParser.map PostsListByTagRoute (s "blog" </> s "tags" </> string)
+        , UrlParser.map PostNewRoute (s "blog" </> s "new")
         , UrlParser.map PostViewRoute (s "blog" </> string)
         , UrlParser.map PostEditRoute (s "blog" </> string </> s "edit")
         , UrlParser.map AboutRoute (s "about")
@@ -166,6 +210,9 @@ routeToPath route =
 
         PostEditRoute slug ->
             "/blog/" ++ slug ++ "/edit"
+
+        PostNewRoute ->
+            "/blog/new"
 
         AboutRoute ->
             "/about"
@@ -189,7 +236,7 @@ isRouteActive route parentRoute =
         ( Just (PostViewRoute _), PostsListRoute ) ->
             True
 
-        ( Just (PostEditRoute _), PostViewRoute _ ) ->
+        ( Just PostNewRoute, PostsListRoute ) ->
             True
 
         ( Just (PostEditRoute _), PostsListRoute ) ->
@@ -262,7 +309,10 @@ viewContent model =
             [ getPostBySlug slug model.posts |> viewPost ]
 
         Just (PostEditRoute slug) ->
-            [ getPostBySlug slug model.posts |> viewPostEdit ]
+            [ viewPostEdit model.post ]
+
+        Just PostNewRoute ->
+            [ viewPostEdit model.post ]
 
         Just AboutRoute ->
             [ viewAbout ]
@@ -302,6 +352,30 @@ viewPostEdit post =
         input inputElement variations label_ value =
             label LabelStyle [] (text label_) <|
                 inputElement TextInputStyle ((paddingXY 0 5) :: variations) value
+
+        updatePostMarkdown markdown =
+            case post of
+                Just post_ ->
+                    Update { post_ | markdown = markdown }
+
+                Nothing ->
+                    DoNothing ""
+
+        updatePostDescription description =
+            case post of
+                Just post_ ->
+                    Update { post_ | description = description }
+
+                Nothing ->
+                    DoNothing ""
+
+        updatePostTitle title =
+            case post of
+                Just post_ ->
+                    Update { post_ | title = title }
+
+                Nothing ->
+                    DoNothing ""
     in
         case post of
             Just post ->
@@ -312,12 +386,12 @@ viewPostEdit post =
                         [ viewPostMeta post
                         , paragraph PostTitle [] [ text "Edit Post" ]
                         ]
-                    , input inputText [] "Title" post.title
-                    , el None [] (text "Is Published?") |> checkbox post.isPublished None []
-                    , input textArea [] "Description" post.description
+                    , input inputText [ onInput updatePostTitle ] "Title" post.title
+                    , el None [] (text "Is Published?") |> checkbox post.isPublished None [ onInput updatePostTitle ]
+                    , input textArea [ onInput updatePostDescription ] "Description" post.description
                     , input inputText [] "Project" post.title
                     , input inputText [] "Tags" post.title
-                    , input textArea [ rows 25 ] "Body" post.markdown
+                    , input textArea [ rows 25, onInput updatePostMarkdown ] "Body" post.markdown
                     ]
 
             Nothing ->
@@ -342,6 +416,10 @@ viewLink style attributes label route =
     el style ((onClick (ChangeRoute route)) :: attributes) (text label) |> node "a"
 
 
+viewButton label msg =
+    el ButtonStyle [ paddingXY 10 0, onClick msg ] (text label)
+
+
 viewPostMeta : Post -> Element Styles Variations Msg
 viewPostMeta post =
     row None
@@ -354,7 +432,9 @@ viewPostMeta post =
         , row None
             [ spacing 10 ]
             [ viewLink ButtonStyle [ paddingXY 10 0 ] "edit" (PostEditRoute post.slug)
-            , viewLink ButtonStyle [ paddingXY 10 0 ] "delete" (PostEditRoute post.slug)
+            , viewButton "delete" (PostSaveOrCreate post)
+            , viewButton "save" (PostSaveOrCreate post)
+            , viewLink ButtonStyle [ paddingXY 10 0 ] "new" PostNewRoute
             ]
         ]
 
@@ -494,26 +574,54 @@ subscriptions model =
 -- HTTP
 
 
-makeApiCall : String -> (Result Http.Error a -> Msg) -> Decode.Decoder a -> Cmd Msg
-makeApiCall endpoint message decoder =
+makeRequest method body endpoint message decoder =
     let
         url =
-            "http://localhost:3000/api/"
-
-        fullUrl =
-            url ++ endpoint
+            "//localhost:3000/api/" ++ endpoint
     in
-        Http.send message (Http.get fullUrl decoder)
+        Http.send message
+            (Http.request
+                { method = method
+                , headers =
+                    [--Http.header "Authorization" "Bearer"
+                    ]
+                , url = url
+                , body = body
+                , timeout = Nothing
+                , expect = Http.expectJson decoder
+                , withCredentials = False
+                }
+            )
+
+
+makePostRequest : String -> (Result Http.Error a -> Msg) -> Http.Body -> Decode.Decoder a -> Cmd Msg
+makePostRequest endpoint message body decoder =
+    makeRequest "POST" body endpoint message decoder
+
+
+makePutRequest : String -> (Result Http.Error a -> Msg) -> Http.Body -> Decode.Decoder a -> Cmd Msg
+makePutRequest endpoint message body decoder =
+    makeRequest "PUT" body endpoint message decoder
+
+
+makeGetRequest : String -> (Result Http.Error a -> Msg) -> Decode.Decoder a -> Cmd Msg
+makeGetRequest endpoint message decoder =
+    makeRequest "GET" Http.emptyBody endpoint message decoder
 
 
 getPosts : Cmd Msg
 getPosts =
-    makeApiCall "posts" LoadPosts postsDecoder
+    makeGetRequest "posts" LoadPosts postsDecoder
+
+
+postPost : Post -> Cmd Msg
+postPost post =
+    makePostRequest "posts" LoadPosts (postEncoder post |> Http.jsonBody) postsDecoder
 
 
 getTags : Cmd Msg
 getTags =
-    makeApiCall "tags" LoadTags tagsDecoder
+    makeGetRequest "tags" LoadTags tagsDecoder
 
 
 
@@ -541,8 +649,8 @@ tagDecoder =
         |> Pipeline.required "name" Decode.string
 
 
-basePostDecoder : Decode.Decoder Post
-basePostDecoder =
+postDecoder : Decode.Decoder Post
+postDecoder =
     decode Post
         |> Pipeline.required "_id" Decode.string
         |> Pipeline.required "title" Decode.string
@@ -555,9 +663,23 @@ basePostDecoder =
         |> Pipeline.required "tags" (Decode.list tagDecoder)
 
 
+postEncoder : Post -> Encode.Value
+postEncoder post =
+    Encode.object
+        [ ( "post"
+          , Encode.object
+                [ ( "title", Encode.string post.title )
+                , ( "markdown", Encode.string post.markdown )
+                , ( "description", Encode.string post.description )
+                , ( "isPublished", Encode.bool post.isPublished )
+                ]
+          )
+        ]
+
+
 postsDecoder : Decode.Decoder (List Post)
 postsDecoder =
-    Decode.field "posts" (Decode.list basePostDecoder)
+    Decode.field "posts" (Decode.list postDecoder)
 
 
 tagsDecoder : Decode.Decoder (List Tag)
