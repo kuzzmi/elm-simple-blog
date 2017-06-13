@@ -1,4 +1,8 @@
 .post-body {
+    a, button, div {
+        user-select: text;
+    }
+
     a {
         color: rgb(255, 131, 0);
     }

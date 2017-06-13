@@ -6,7 +6,9 @@ require('highlight.js/styles/tomorrow-night-eighties.css');
 
 var Elm = require('./Main');
 
-var app = Elm.Main.embed(document.getElementById('root'));
+var app = Elm.Main.embed(document.getElementById('root'), {
+    accessToken: localStorage.getItem('access_token')
+});
 
 // var disqus_config = function () {
 //     this.page.url = PAGE_URL;  // Replace PAGE_URL with your page's canonical URL variable
@@ -21,8 +23,14 @@ var app = Elm.Main.embed(document.getElementById('root'));
 // })();
 //
 //
+
+app.ports.saveAccessTokenToLocalStorage.subscribe(function(accessToken) {
+    console.log('GOT ACCESS TOKEN', accessToken);
+    localStorage.setItem('access_token', accessToken);
+});
+
 app.ports.setDisqusIdentifier.subscribe(function(slug) {
-    console.log('PORT FIRED');
+    console.log('GOT NEW DISQUS SLUG', slug);
     setTimeout(function() {
         document.querySelectorAll('pre code').forEach(function(block) {
             hljs.highlightBlock(block);

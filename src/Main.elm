@@ -9,8 +9,7 @@ import Http
 import Json.Encode as Encode
 import Json.Decode as Decode
 import Json.Decode.Pipeline as Pipeline exposing (decode, required)
-import Navigation
-import UrlParser exposing (Parser, (</>), s, int, string, oneOf, parsePath)
+import Navigation exposing (programWithFlags, Location)
 import Date
 import Date.Extra as Date
 import Dom.Scroll
@@ -18,6 +17,8 @@ import Task
 import Debug
 import Styles exposing (..)
 import Gravatar exposing (getGravatarUrl)
+import Models exposing (..)
+import Routing
 
 
 {-| This is used to update page identificator of the page for disqus
@@ -25,8 +26,18 @@ import Gravatar exposing (getGravatarUrl)
 port setDisqusIdentifier : Slug -> Cmd msg
 
 
+{-| This is used to update localStorage with accessToken
+-}
+port saveAccessTokenToLocalStorage : Token -> Cmd msg
+
+
+type alias Flags =
+    { accessToken : Token
+    }
+
+
 main =
-    Navigation.program UrlChange
+    Navigation.programWithFlags UrlChange
         { init = init
         , view = view
         , update = update
@@ -36,23 +47,6 @@ main =
 
 
 -- MODEL
-
-
-type alias ID =
-    String
-
-
-type alias Post =
-    { id : ID
-    , title : String
-    , body : String
-    , markdown : String
-    , dateCreated : Date.Date
-    , isPublished : Bool
-    , slug : String
-    , description : String
-    , tags : List Tag
-    }
 
 
 emptyPost : Maybe Post
@@ -70,32 +64,20 @@ emptyPost =
         }
 
 
-type alias Tag =
-    { id : ID
-    , name : String
-    }
-
-
-type alias Slug =
-    String
-
-
-type alias Model =
-    { posts : List Post
-    , tags : List Tag
-    , post : Maybe Post
-    , currentRoute : Maybe Route
-    }
-
-
-init : Navigation.Location -> ( Model, Cmd Msg )
-init location =
+init : Flags -> Location -> ( Model, Cmd Msg )
+init flags location =
     ( { posts = []
       , tags = []
       , post = Nothing
-      , currentRoute = parsePath routeParser location
+      , creds =
+            { username = ""
+            , password = ""
+            , isError = False
+            }
+      , accessToken = flags.accessToken
+      , currentRoute = Routing.parse location
       }
-    , Cmd.batch [ getPosts, getTags ]
+    , Cmd.batch [ getPosts flags.accessToken, getTags flags.accessToken ]
     )
 
 
@@ -104,12 +86,23 @@ init location =
 
 
 type Msg
-    = LoadPosts (Result Http.Error (List Post))
-    | LoadTags (Result Http.Error (List Tag))
+    = LoadTags (Result Http.Error (List Tag))
+      -- posts CRUD operations
+    | LoadPosts (Result Http.Error (List Post))
+    | PostAdd (Result Http.Error Post)
+    | PostUpdate (Result Http.Error Post)
+    | PostDelete Post
     | PostSaveOrCreate Post
-    | UrlChange Navigation.Location
-    | Update Post
+      -- auth
+    | GetAccessToken (Result Http.Error Token)
+    | Login
+      -- forms
+    | UpdatePost Post
+    | UpdateCreds Credentials
+      -- routing
     | ChangeRoute Route
+    | UrlChange Location
+      -- misc
     | DoNothing String
 
 
@@ -119,19 +112,46 @@ scrollToTopCmd =
         |> Task.attempt (always (DoNothing ""))
 
 
-navigateToRoute : Route -> Cmd Msg
-navigateToRoute route =
-    routeToPath route |> Navigation.newUrl
-
-
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case Debug.log "message" msg of
         LoadPosts (Ok posts) ->
-            ( { model | posts = posts }, setDisqusIdentifier "test" )
+            ( { model | posts = posts }, Cmd.none )
 
         LoadPosts (Err _) ->
             ( model, Cmd.none )
+
+        PostAdd (Ok post) ->
+            ( { model | posts = post :: model.posts }
+            , Routing.navigateToRoute (PostViewRoute post.slug)
+            )
+
+        PostAdd (Err _) ->
+            ( model, Cmd.none )
+
+        PostUpdate (Ok post) ->
+            let
+                update post_ =
+                    if post_.id == post.id then
+                        post
+                    else
+                        post_
+            in
+                ( { model | posts = List.map update model.posts }
+                , Routing.navigateToRoute (PostViewRoute post.slug)
+                )
+
+        PostUpdate (Err _) ->
+            ( model, Cmd.none )
+
+        PostDelete post ->
+            ( { model | posts = List.filter (\post_ -> post_.id /= post.id) model.posts }
+            , Cmd.batch
+                [ scrollToTopCmd
+                , deletePost model.accessToken post
+                , Routing.navigateToRoute PostsListRoute
+                ]
+            )
 
         LoadTags (Ok tags) ->
             ( { model | tags = tags }, Cmd.none )
@@ -140,17 +160,31 @@ update msg model =
             ( model, Cmd.none )
 
         UrlChange location ->
-            ( { model | currentRoute = parsePath routeParser location }
-            , Cmd.batch [ setDisqusIdentifier "test", scrollToTopCmd ]
-            )
+            let
+                route =
+                    Routing.parse location
+            in
+                case route of
+                    Just (PostViewRoute slug) ->
+                        ( { model | currentRoute = route }
+                        , Cmd.batch [ scrollToTopCmd, setDisqusIdentifier slug ]
+                        )
 
-        Update post ->
+                    _ ->
+                        ( { model | currentRoute = route }
+                        , scrollToTopCmd
+                        )
+
+        UpdatePost post ->
             ( { model | post = Just post }, Cmd.none )
+
+        UpdateCreds creds ->
+            ( { model | creds = creds }, Cmd.none )
 
         ChangeRoute route ->
             let
                 scrollAndGo =
-                    Cmd.batch [ scrollToTopCmd, navigateToRoute route ]
+                    Cmd.batch [ scrollToTopCmd, Routing.navigateToRoute route ]
             in
                 case route of
                     PostEditRoute slug ->
@@ -165,92 +199,59 @@ update msg model =
                         ( model, scrollAndGo )
 
         PostSaveOrCreate post ->
-            ( model, Cmd.batch [ postPost post, navigateToRoute PostsListRoute ] )
+            let
+                isNew =
+                    if post.id == "" then
+                        True
+                    else
+                        False
+
+                method =
+                    if isNew then
+                        postPost
+                    else
+                        updatePost
+            in
+                ( model
+                , method model.accessToken post
+                )
+
+        Login ->
+            ( model, Cmd.batch [ postCreds Nothing model.creds ] )
+
+        GetAccessToken (Ok token) ->
+            ( { model | accessToken = token }
+            , Cmd.batch
+                [ saveAccessTokenToLocalStorage token
+                , getPosts token
+                , getTags token
+                , Routing.navigateToRoute PostsListRoute
+                ]
+            )
+
+        GetAccessToken (Err _) ->
+            let
+                newCreds creds =
+                    { creds | isError = True }
+            in
+                ( { model | creds = newCreds model.creds }, Cmd.none )
 
         DoNothing _ ->
             ( model, Cmd.none )
 
 
 
--- ROUTING
-
-
-type Route
-    = PostsListRoute
-    | PostsListByTagRoute ID
-    | PostViewRoute Slug
-    | PostNewRoute
-    | PostEditRoute Slug
-    | AboutRoute
-
-
-routeParser : Parser (Route -> a) a
-routeParser =
-    oneOf
-        [ UrlParser.map PostsListRoute (s "blog")
-        , UrlParser.map PostsListByTagRoute (s "blog" </> s "tags" </> string)
-        , UrlParser.map PostNewRoute (s "blog" </> s "new")
-        , UrlParser.map PostViewRoute (s "blog" </> string)
-        , UrlParser.map PostEditRoute (s "blog" </> string </> s "edit")
-        , UrlParser.map AboutRoute (s "about")
-        ]
-
-
-routeToPath : Route -> String
-routeToPath route =
-    case route of
-        PostsListRoute ->
-            "/blog"
-
-        PostsListByTagRoute id ->
-            "/blog/tags/" ++ id
-
-        PostViewRoute slug ->
-            "/blog/" ++ slug
-
-        PostEditRoute slug ->
-            "/blog/" ++ slug ++ "/edit"
-
-        PostNewRoute ->
-            "/blog/new"
-
-        AboutRoute ->
-            "/about"
-
-
-isRouteActive : Maybe Route -> Route -> Bool
-isRouteActive route parentRoute =
-    case ( route, parentRoute ) of
-        ( Nothing, PostsListRoute ) ->
-            True
-
-        ( Just PostsListRoute, PostsListRoute ) ->
-            True
-
-        ( Just (PostsListByTagRoute _), PostsListRoute ) ->
-            True
-
-        ( Just (PostViewRoute _), PostViewRoute _ ) ->
-            True
-
-        ( Just (PostViewRoute _), PostsListRoute ) ->
-            True
-
-        ( Just PostNewRoute, PostsListRoute ) ->
-            True
-
-        ( Just (PostEditRoute _), PostsListRoute ) ->
-            True
-
-        ( Just AboutRoute, AboutRoute ) ->
-            True
-
-        ( _, _ ) ->
-            False
-
-
-
 -- MAIN VIEW
+
+
+isAuthorized : Token -> Bool
+isAuthorized token =
+    case token of
+        Just _ ->
+            True
+
+        Nothing ->
+            False
 
 
 view : Model -> Html.Html Msg
@@ -259,7 +260,7 @@ view model =
         []
         [ column Main
             [ center, width (px 900) ]
-            [ viewHeader model.currentRoute
+            [ viewHeader (model.accessToken /= Nothing) model.currentRoute
             , column None
                 [ spacing 100 ]
                 (viewContent model)
@@ -291,47 +292,90 @@ getPostsByTag tag posts =
 
 viewContent : Model -> List (Element Styles Variations Msg)
 viewContent model =
-    case model.currentRoute of
-        Just PostsListRoute ->
-            [ viewPostsList model.posts ]
+    let
+        isAuthorized =
+            model.accessToken /= Nothing
+    in
+        case model.currentRoute of
+            Just PostsListRoute ->
+                [ viewPostsList isAuthorized model.posts ]
 
-        Just (PostsListByTagRoute tagId) ->
-            let
-                tag =
-                    getTagById tagId model.tags
+            Just (PostsListByTagRoute tagId) ->
+                let
+                    tag =
+                        getTagById tagId model.tags
 
-                posts =
-                    getPostsByTag tag model.posts
-            in
-                [ viewPostsListByTag tag posts ]
+                    posts =
+                        getPostsByTag tag model.posts
+                in
+                    [ viewPostsListByTag isAuthorized tag posts ]
 
-        Just (PostViewRoute slug) ->
-            [ getPostBySlug slug model.posts |> viewPost ]
+            Just (PostViewRoute slug) ->
+                [ getPostBySlug slug model.posts |> viewPost isAuthorized ]
 
-        Just (PostEditRoute slug) ->
-            [ viewPostEdit model.post ]
+            Just (PostEditRoute slug) ->
+                [ viewPostEdit isAuthorized model.post ]
 
-        Just PostNewRoute ->
-            [ viewPostEdit model.post ]
+            Just PostNewRoute ->
+                [ viewPostEdit isAuthorized model.post ]
 
-        Just AboutRoute ->
-            [ viewAbout ]
+            Just AboutRoute ->
+                [ viewAbout isAuthorized ]
 
-        Nothing ->
-            [ viewPostsList model.posts ]
+            Just LoginRoute ->
+                [ viewLogin isAuthorized model.creds ]
+
+            Nothing ->
+                [ viewPostsList isAuthorized model.posts ]
+
+
+
+-- LOGIN VIEW
+
+
+viewLogin : Bool -> Credentials -> Element Styles Variations Msg
+viewLogin isAuthorized creds =
+    let
+        input inputElement variations label_ value =
+            label LabelStyle [] (text label_) <|
+                inputElement TextInputStyle ((paddingXY 0 5) :: variations) value
+
+        updatePassword password =
+            UpdateCreds { creds | password = password }
+
+        updateUsername username =
+            UpdateCreds { creds | username = username }
+    in
+        column None
+            [ spacing 30, width (px 900) ]
+            [ column None
+                [ spacing 5 ]
+                [ paragraph PostTitle [] [ text "Login" ]
+                ]
+            , when (creds.isError == True) (el ErrorStyle [ paddingXY 20 10 ] (text "Looks like credentials are not correct or there is another problem"))
+            , input inputText [ onInput updateUsername ] "Username" creds.username
+            , input inputText [ onInput updatePassword ] "Password" creds.password
+            , el None [ center ] (viewButton "Login" Login)
+            ]
 
 
 
 -- POST VIEWS
 
 
-viewPost : Maybe Post -> Element Styles Variations Msg
-viewPost post =
+viewPost : Bool -> Maybe Post -> Element Styles Variations Msg
+viewPost isAuthorized post =
     case post of
         Just post ->
             column None
                 [ spacing 5 ]
-                [ viewPostMeta post
+                [ viewPostMeta isAuthorized
+                    post
+                    [ viewLink ButtonStyle [ paddingXY 10 0 ] "edit" (PostEditRoute post.slug)
+                    , when (post.isPublished == False) (viewButton "publish" (PostSaveOrCreate { post | isPublished = not post.isPublished }))
+                    , when (post.isPublished == True) (viewButton "unpublish" (PostSaveOrCreate { post | isPublished = not post.isPublished }))
+                    , viewButton "delete" (PostDelete post)
+                    ]
                 , paragraph PostTitle [ vary Link False ] [ text post.title ]
                 , el None
                     [ width (px 900), class "post-body" ]
@@ -346,33 +390,41 @@ viewPost post =
                 [ paragraph PostTitle [] [ text "Nothing found" ] ]
 
 
-viewPostEdit : Maybe Post -> Element Styles Variations Msg
-viewPostEdit post =
+viewPostEdit : Bool -> Maybe Post -> Element Styles Variations Msg
+viewPostEdit isAuthorized post =
     let
         input inputElement variations label_ value =
             label LabelStyle [] (text label_) <|
                 inputElement TextInputStyle ((paddingXY 0 5) :: variations) value
 
-        updatePostMarkdown markdown =
+        updateMarkdown markdown =
             case post of
                 Just post_ ->
-                    Update { post_ | markdown = markdown }
+                    UpdatePost { post_ | markdown = markdown }
 
                 Nothing ->
                     DoNothing ""
 
-        updatePostDescription description =
+        updateDescription description =
             case post of
                 Just post_ ->
-                    Update { post_ | description = description }
+                    UpdatePost { post_ | description = description }
 
                 Nothing ->
                     DoNothing ""
 
-        updatePostTitle title =
+        updateTitle title =
             case post of
                 Just post_ ->
-                    Update { post_ | title = title }
+                    UpdatePost { post_ | title = title }
+
+                Nothing ->
+                    DoNothing ""
+
+        updateIsPublished =
+            case post of
+                Just post_ ->
+                    UpdatePost { post_ | isPublished = not post_.isPublished }
 
                 Nothing ->
                     DoNothing ""
@@ -383,15 +435,20 @@ viewPostEdit post =
                     [ spacing 30, width (px 900) ]
                     [ column None
                         [ spacing 5 ]
-                        [ viewPostMeta post
+                        [ viewPostMeta isAuthorized
+                            post
+                            [ viewButton "save" (PostSaveOrCreate post)
+                            , when (post.isPublished == False) (viewButton "publish" (PostSaveOrCreate { post | isPublished = not post.isPublished }))
+                            , when (post.isPublished == True) (viewButton "unpublish" (PostSaveOrCreate { post | isPublished = not post.isPublished }))
+                            ]
                         , paragraph PostTitle [] [ text "Edit Post" ]
                         ]
-                    , input inputText [ onInput updatePostTitle ] "Title" post.title
-                    , el None [] (text "Is Published?") |> checkbox post.isPublished None [ onInput updatePostTitle ]
-                    , input textArea [ onInput updatePostDescription ] "Description" post.description
+                    , input inputText [ onInput updateTitle ] "Title" post.title
+                    , el None [] (text "Is Published?") |> checkbox post.isPublished None [ onClick updateIsPublished ]
+                    , input textArea [ onInput updateDescription ] "Description" post.description
                     , input inputText [] "Project" post.title
                     , input inputText [] "Tags" post.title
-                    , input textArea [ rows 25, onInput updatePostMarkdown ] "Body" post.markdown
+                    , input textArea [ rows 25, onInput updateMarkdown ] "Body" post.markdown
                     ]
 
             Nothing ->
@@ -402,14 +459,7 @@ viewPostEdit post =
 
 viewPostStatus : Bool -> Element Styles Variations Msg
 viewPostStatus isPublished =
-    let
-        status =
-            if isPublished then
-                "Published"
-            else
-                "Draft"
-    in
-        el None [] (text ("[" ++ status ++ "]"))
+    when (isPublished == False) (el ErrorStyle [ paddingXY 10 0 ] (text "DRAFT"))
 
 
 viewLink style attributes label route =
@@ -420,8 +470,8 @@ viewButton label msg =
     el ButtonStyle [ paddingXY 10 0, onClick msg ] (text label)
 
 
-viewPostMeta : Post -> Element Styles Variations Msg
-viewPostMeta post =
+viewPostMeta : Bool -> Post -> List (Element Styles Variations Msg) -> Element Styles Variations Msg
+viewPostMeta isAuthorized post buttons =
     row None
         [ justify ]
         [ row None
@@ -429,44 +479,54 @@ viewPostMeta post =
             [ viewPostStatus post.isPublished
             , el None [] (Date.toFormattedString "MMMM ddd, y" post.dateCreated |> text)
             ]
-        , row None
-            [ spacing 10 ]
-            [ viewLink ButtonStyle [ paddingXY 10 0 ] "edit" (PostEditRoute post.slug)
-            , viewButton "delete" (PostSaveOrCreate post)
-            , viewButton "save" (PostSaveOrCreate post)
-            , viewLink ButtonStyle [ paddingXY 10 0 ] "new" PostNewRoute
-            ]
+        , when (isAuthorized == True) (row None [ spacing 10 ] buttons)
         ]
 
 
-viewPostsListItem : Post -> Element Styles Variations Msg
-viewPostsListItem post =
+
+-- add disqus count https://help.disqus.com/customer/portal/articles/565624
+
+
+viewPostsListItem : Bool -> Post -> Element Styles Variations Msg
+viewPostsListItem isAuthorized post =
     column None
         [ spacing 5 ]
-        [ viewPostMeta post
+        [ viewPostMeta isAuthorized
+            post
+            [ viewLink ButtonStyle [ paddingXY 10 0 ] "edit" (PostEditRoute post.slug)
+            , viewButton "delete" (PostDelete post)
+            ]
         , viewLink PostTitle [ vary Link True ] post.title (PostViewRoute post.slug)
         , paragraph None [] [ text post.description ]
         , viewTags post.tags
         ]
 
 
-viewPostsList : List Post -> Element Styles Variations Msg
-viewPostsList posts =
-    column None [ spacing 100 ] (List.map viewPostsListItem posts)
+viewPostsList : Bool -> List Post -> Element Styles Variations Msg
+viewPostsList isAuthorized posts =
+    let
+        viewPostsListItem_ =
+            viewPostsListItem isAuthorized
+    in
+        column None
+            [ spacing 50 ]
+            [ when (isAuthorized == True) (el None [ alignLeft ] (viewLink ButtonStyle [ paddingXY 10 0 ] "new post" PostNewRoute))
+            , column None [ spacing 100 ] (List.map viewPostsListItem_ posts)
+            ]
 
 
-viewPostsListByTag : Maybe Tag -> List Post -> Element Styles Variations Msg
-viewPostsListByTag tag posts =
+viewPostsListByTag : Bool -> Maybe Tag -> List Post -> Element Styles Variations Msg
+viewPostsListByTag isAuthorized tag posts =
     case tag of
         Just tag ->
             column None
-                [ spacing 50 ]
+                [ spacing 10 ]
                 [ row None
                     [ spacing 20 ]
                     [ paragraph None [] [ text "Posts by tag" ]
                     , viewTag tag
                     ]
-                , column None [ spacing 100 ] (List.map viewPostsListItem posts)
+                , viewPostsList isAuthorized posts
                 ]
 
         Nothing ->
@@ -512,8 +572,8 @@ viewGravatar email =
         image imageUrl None [] (text "My Photo")
 
 
-viewAbout : Element Styles Variations msg
-viewAbout =
+viewAbout : Bool -> Element Styles Variations msg
+viewAbout isAuthorized =
     column None
         [ spacing 10 ]
         [ viewGravatar "kuzzmi@gmail.com"
@@ -521,11 +581,15 @@ viewAbout =
         ]
 
 
-viewHeader : Maybe Route -> Element Styles Variations Msg
-viewHeader currentRoute =
+
+-- MISC
+
+
+viewHeader : Bool -> Maybe Route -> Element Styles Variations Msg
+viewHeader isAuthorized currentRoute =
     let
         isActive route =
-            isRouteActive currentRoute route
+            Routing.isRouteActive currentRoute route
 
         navLink label route =
             viewLink NavOption [ vary Active (isActive route), paddingXY 15 0 ] label route
@@ -538,10 +602,13 @@ viewHeader currentRoute =
                 , row None
                     [ spacing 40 ]
                     [ navLink "blog" PostsListRoute
+                    , navLink "projects" AboutRoute
                     , navLink "about" AboutRoute
+                    , when (isAuthorized == False) (navLink "login" LoginRoute)
                     ]
                     |> nav
-                , el NavOption [] (text "rss") |> link "http://feeds.feedburner.com/kuzzmi"
+
+                -- , el NavOption [] (text "rss") |> link "http://feeds.feedburner.com/kuzzmi"
                 ]
             )
 
@@ -574,17 +641,24 @@ subscriptions model =
 -- HTTP
 
 
-makeRequest method body endpoint message decoder =
+makeRequest method body token endpoint message decoder =
     let
         url =
             "//localhost:3000/api/" ++ endpoint
+
+        headers =
+            case token of
+                Just token_ ->
+                    [ Http.header "Authorization" ("Bearer " ++ token_)
+                    ]
+
+                Nothing ->
+                    []
     in
         Http.send message
             (Http.request
                 { method = method
-                , headers =
-                    [--Http.header "Authorization" "Bearer"
-                    ]
+                , headers = headers
                 , url = url
                 , body = body
                 , timeout = Nothing
@@ -594,34 +668,50 @@ makeRequest method body endpoint message decoder =
             )
 
 
-makePostRequest : String -> (Result Http.Error a -> Msg) -> Http.Body -> Decode.Decoder a -> Cmd Msg
-makePostRequest endpoint message body decoder =
-    makeRequest "POST" body endpoint message decoder
+makePostRequest value =
+    makeRequest "POST" (Http.jsonBody value)
 
 
-makePutRequest : String -> (Result Http.Error a -> Msg) -> Http.Body -> Decode.Decoder a -> Cmd Msg
-makePutRequest endpoint message body decoder =
-    makeRequest "PUT" body endpoint message decoder
+makePutRequest value =
+    makeRequest "PUT" (Http.jsonBody value)
 
 
-makeGetRequest : String -> (Result Http.Error a -> Msg) -> Decode.Decoder a -> Cmd Msg
-makeGetRequest endpoint message decoder =
-    makeRequest "GET" Http.emptyBody endpoint message decoder
+makeGetRequest =
+    makeRequest "GET" Http.emptyBody
 
 
-getPosts : Cmd Msg
-getPosts =
-    makeGetRequest "posts" LoadPosts postsDecoder
+makeDeleteRequest =
+    makeRequest "DELETE" Http.emptyBody
 
 
-postPost : Post -> Cmd Msg
-postPost post =
-    makePostRequest "posts" LoadPosts (postEncoder post |> Http.jsonBody) postsDecoder
+getPosts : Token -> Cmd Msg
+getPosts token =
+    makeGetRequest token "posts" LoadPosts postsDecoder
 
 
-getTags : Cmd Msg
-getTags =
-    makeGetRequest "tags" LoadTags tagsDecoder
+postPost : Token -> Post -> Cmd Msg
+postPost token post =
+    makePostRequest (postEncoder post) token "posts" PostAdd (Decode.field "post" postDecoder)
+
+
+deletePost : Token -> Post -> Cmd Msg
+deletePost token post =
+    makeDeleteRequest token ("posts/" ++ post.id) PostAdd (Decode.field "post" postDecoder)
+
+
+updatePost : Token -> Post -> Cmd Msg
+updatePost token post =
+    makePutRequest (postEncoder post) token ("posts/" ++ post.id) PostUpdate (Decode.field "post" postDecoder)
+
+
+getTags : Token -> Cmd Msg
+getTags token =
+    makeGetRequest token "tags" LoadTags tagsDecoder
+
+
+postCreds : Token -> Credentials -> Cmd Msg
+postCreds token creds =
+    makePostRequest (credsEncoder creds) token "auth/local" GetAccessToken tokenDecoder
 
 
 
@@ -649,6 +739,19 @@ tagDecoder =
         |> Pipeline.required "name" Decode.string
 
 
+tagEncoder : Tag -> Encode.Value
+tagEncoder tag =
+    Encode.object
+        [ ( "name", Encode.string tag.name )
+        , ( "_id", Encode.string tag.id )
+        ]
+
+
+tagsEncoder : List Tag -> List Encode.Value
+tagsEncoder tags =
+    List.map tagEncoder tags
+
+
 postDecoder : Decode.Decoder Post
 postDecoder =
     decode Post
@@ -672,9 +775,24 @@ postEncoder post =
                 , ( "markdown", Encode.string post.markdown )
                 , ( "description", Encode.string post.description )
                 , ( "isPublished", Encode.bool post.isPublished )
+                , ( "tags", Encode.list (tagsEncoder post.tags) )
                 ]
           )
         ]
+
+
+credsEncoder : Credentials -> Encode.Value
+credsEncoder creds =
+    Encode.object
+        [ ( "username", Encode.string creds.username )
+        , ( "password", Encode.string creds.password )
+        ]
+
+
+tokenDecoder : Decode.Decoder Token
+tokenDecoder =
+    Decode.field "access_token"
+        (Decode.nullable Decode.string)
 
 
 postsDecoder : Decode.Decoder (List Post)

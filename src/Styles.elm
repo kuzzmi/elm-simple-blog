@@ -17,6 +17,7 @@ type Styles
     | ButtonStyle
     | TextInputStyle
     | LabelStyle
+    | ErrorStyle
     | Footer
     | FooterLogo
     | FooterHeart
@@ -66,6 +67,7 @@ stylesheet =
             [ Font.size 26
             , Font.weight 600
             , Color.text orange
+            , Style.cursor "pointer"
             , hover
                 [ Font.underline
                 ]
@@ -93,8 +95,8 @@ stylesheet =
                 ]
             ]
         , style ButtonStyle
-            [ Color.text darkGrey
-            , Color.background (Color.rgb 242 242 242)
+            [ Color.background darkGrey
+            , Color.text Color.white
             , Style.cursor "pointer"
             , hover
                 [ Color.text orange
@@ -103,6 +105,11 @@ stylesheet =
         , style LabelStyle
             [ Color.border darkGrey
             , Font.weight 600
+            ]
+        , style ErrorStyle
+            [ Color.text Color.white
+            , Color.background Color.red
+            , Style.cursor "default"
             ]
         , style TextInputStyle
             [ Font.typeface [ "Overpass", "monospace" ]
