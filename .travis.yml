@@ -6,9 +6,20 @@ cache:
   directories:
   - node_modules # npm packages
   - elm-stuff    # elm packages
+  - sysconfcpus
 
 before_script:
-    - npm i -g elm
+  - npm i -g elm
+  # Faster compile on Travis.
+  - |
+    if [ ! -d sysconfcpus/bin ];
+    then
+      git clone https://github.com/obmarg/libsysconfcpus.git;
+      cd libsysconfcpus;
+      ./configure --prefix=$TRAVIS_BUILD_DIR/sysconfcpus;
+      make && make install;
+      cd ..;
+    fi
 
 script:
-    - yarn build
+  - $TRAVIS_BUILD_DIR/sysconfcpus/bin/sysconfcpus -n 2; yarn build
