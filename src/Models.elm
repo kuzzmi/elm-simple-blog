@@ -9,6 +9,7 @@ type Route
     | PostViewRoute Slug
     | PostNewRoute
     | PostEditRoute Slug
+    | ProjectsListRoute
     | LoginRoute
     | AboutRoute
 

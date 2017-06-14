@@ -319,6 +319,9 @@ viewContent model =
             Just PostNewRoute ->
                 [ viewPostEdit isAuthorized model.post ]
 
+            Just ProjectsListRoute ->
+                [ viewLogin isAuthorized model.creds ]
+
             Just AboutRoute ->
                 [ viewAbout isAuthorized ]
 

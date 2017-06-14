@@ -23,6 +23,7 @@ routeParser =
         , UrlParser.map PostNewRoute (s "blog" </> s "new")
         , UrlParser.map PostViewRoute (s "blog" </> string)
         , UrlParser.map PostEditRoute (s "blog" </> string </> s "edit")
+        , UrlParser.map ProjectsListRoute (s "projects")
         , UrlParser.map LoginRoute (s "login")
         , UrlParser.map AboutRoute (s "about")
         ]
@@ -45,6 +46,9 @@ routeToPath route =
 
         PostNewRoute ->
             "/blog/new"
+
+        ProjectsListRoute ->
+            "/projects"
 
         LoginRoute ->
             "/login"
