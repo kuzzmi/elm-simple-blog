@@ -8,8 +8,7 @@ cache:
   - elm-stuff    # elm packages
 
 before_script:
-    - npm i -g yarn
-    - yarn install
+    - npm i -g elm
 
 script:
     - yarn build
