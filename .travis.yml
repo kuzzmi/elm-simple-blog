@@ -1,0 +1,15 @@
+language: node_js
+node_js:
+    - "node"
+
+cache:
+  directories:
+  - node_modules # npm packages
+  - elm-stuff    # elm packages
+
+before_script:
+    - npm i -g yarn
+    - yarn install
+
+script:
+    - yarn build
