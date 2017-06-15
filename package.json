@@ -20,7 +20,7 @@
     "webpack-manifest-plugin": "^1.1.0"
   },
   "scripts": {
-    "build": "webpack -p",
+    "build": "NODE_ENV=production webpack -p",
     "watch": "webpack --watch",
     "dev": "webpack-dev-server --port 8000"
   }
