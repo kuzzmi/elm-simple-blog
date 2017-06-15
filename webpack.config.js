@@ -3,11 +3,18 @@ const path = require('path');
 
 const ExtractTextPlugin = require('extract-text-webpack-plugin');
 const ManifestPlugin = require('webpack-manifest-plugin');
-
 const SWPrecacheWebpackPlugin = require('sw-precache-webpack-plugin');
+const InterpolateHtmlPlugin = require('interpolate-html-plugin');
+const HtmlWebpackPlugin = require('html-webpack-plugin');
 
 const IS_DIST = process.env.NODE_ENV === 'production';
 const PUBLIC_URL = 'https://dev.kuzzmi.com/';
+// kuzzmi.com: 'UA-51775404-4'
+const GA_PROPERTY_ID = IS_DIST ? '' : 'UA-51775404-5';
+
+const paths = {
+    html: path.join(__dirname, './public/index.html'),
+};
 
 let plugins = [
     new ExtractTextPlugin('styles.[contenthash:8].css')
@@ -17,9 +24,30 @@ if (IS_DIST) {
     plugins = [
         ...plugins,
         new webpack.optimize.UglifyJsPlugin(),
+            new InterpolateHtmlPlugin({
+                PUBLIC_URL,
+                GA_PROPERTY_ID
+            }),
+            new HtmlWebpackPlugin({
+                inject: true,
+                template: paths.html,
+                minify: {
+                    removeComments: true,
+                    collapseWhitespace: true,
+                    removeRedundantAttributes: true,
+                    useShortDoctype: true,
+                    removeEmptyAttributes: true,
+                    removeStyleLinkTypeAttributes: true,
+                    keepClosingSlash: true,
+                    minifyJS: true,
+                    minifyCSS: true,
+                    minifyURLs: true,
+                },
+            }),
         new webpack.DefinePlugin({
             'process.env.NODE_ENV': JSON.stringify('production'),
             'process.env.PUBLIC_URL': JSON.stringify(PUBLIC_URL),
+            'process.env.GA_PROPERTY_ID': JSON.stringify(GA_PROPERTY_ID),
         }),
         new webpack.LoaderOptionsPlugin({
             minimize: true,
