@@ -6,6 +6,7 @@ const ManifestPlugin = require('webpack-manifest-plugin');
 const SWPrecacheWebpackPlugin = require('sw-precache-webpack-plugin');
 const InterpolateHtmlPlugin = require('interpolate-html-plugin');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
 
 const IS_DIST = process.env.NODE_ENV === 'production';
 const PUBLIC_URL = 'https://dev.kuzzmi.com/';
@@ -64,6 +65,10 @@ if (IS_DIST) {
             navigateFallback: PUBLIC_URL + 'index.html',
             staticFileGlobsIgnorePatterns: [/\.map$/, /asset-manifest\.json$/]
         }),
+        new CopyWebpackPlugin([
+            { from: './public/favicon.ico' },
+            { from: './public/manifest.json' }
+        ])
     ];
 }
 

@@ -1,0 +1,16 @@
+{
+  "short_name": "kuzzmi@www",
+  "name": "kuzzmi@www",
+  "description": "Blog of Igor Kuzmenko aka kuzzmi",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "192x192",
+      "type": "image/png"
+    }
+  ],
+  "start_url": "./?utm_source=pwa",
+  "display": "standalone",
+  "theme_color": "#ff8300",
+  "background_color": "#ffffff"
+}

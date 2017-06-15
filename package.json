@@ -6,6 +6,7 @@
   "author": "Igor Kuzmenko <igor@kuzzmi.com>",
   "license": "MIT",
   "dependencies": {
+    "copy-webpack-plugin": "^4.0.1",
     "css-loader": "^0.28.4",
     "elm-webpack-loader": "^4.3.1",
     "extract-text-webpack-plugin": "^2.1.2",
