@@ -1,5 +1,6 @@
 require('normalize.css');
 require('./style.scss');
+require('./registerServiceWorker');
 
 var hljs = require('highlight.js');
 require('highlight.js/styles/tomorrow-night-eighties.css');
