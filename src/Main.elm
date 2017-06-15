@@ -33,6 +33,7 @@ port saveAccessTokenToLocalStorage : Token -> Cmd msg
 
 type alias Flags =
     { accessToken : Token
+    , apiUrl : String
     }
 
 
@@ -66,19 +67,24 @@ emptyPost =
 
 init : Flags -> Location -> ( Model, Cmd Msg )
 init flags location =
-    ( { posts = []
-      , tags = []
-      , post = Nothing
-      , creds =
-            { username = ""
-            , password = ""
-            , isError = False
-            }
-      , accessToken = flags.accessToken
-      , currentRoute = Routing.parse location
-      }
-    , Cmd.batch [ getPosts flags.accessToken, getTags flags.accessToken ]
-    )
+    let
+        requester =
+            makeRequest flags.apiUrl flags.accessToken
+    in
+        ( { posts = []
+          , tags = []
+          , post = Nothing
+          , creds =
+                { username = ""
+                , password = ""
+                , isError = False
+                }
+          , accessToken = flags.accessToken
+          , apiUrl = flags.apiUrl
+          , currentRoute = Routing.parse location
+          }
+        , Cmd.batch [ getPosts requester, getTags requester ]
+        )
 
 
 
@@ -114,130 +120,134 @@ scrollToTopCmd =
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case Debug.log "message" msg of
-        LoadPosts (Ok posts) ->
-            ( { model | posts = posts }, Cmd.none )
+    let
+        requester =
+            makeRequest model.apiUrl model.accessToken
+    in
+        case Debug.log "message" msg of
+            LoadPosts (Ok posts) ->
+                ( { model | posts = posts }, Cmd.none )
 
-        LoadPosts (Err _) ->
-            ( model, Cmd.none )
+            LoadPosts (Err _) ->
+                ( model, Cmd.none )
 
-        PostAdd (Ok post) ->
-            ( { model | posts = post :: model.posts }
-            , Routing.navigateToRoute (PostViewRoute post.slug)
-            )
-
-        PostAdd (Err _) ->
-            ( model, Cmd.none )
-
-        PostUpdate (Ok post) ->
-            let
-                update post_ =
-                    if post_.id == post.id then
-                        post
-                    else
-                        post_
-            in
-                ( { model | posts = List.map update model.posts }
+            PostAdd (Ok post) ->
+                ( { model | posts = post :: model.posts }
                 , Routing.navigateToRoute (PostViewRoute post.slug)
                 )
 
-        PostUpdate (Err _) ->
-            ( model, Cmd.none )
+            PostAdd (Err _) ->
+                ( model, Cmd.none )
 
-        PostDelete post ->
-            ( { model | posts = List.filter (\post_ -> post_.id /= post.id) model.posts }
-            , Cmd.batch
-                [ scrollToTopCmd
-                , deletePost model.accessToken post
-                , Routing.navigateToRoute PostsListRoute
-                ]
-            )
+            PostUpdate (Ok post) ->
+                let
+                    update post_ =
+                        if post_.id == post.id then
+                            post
+                        else
+                            post_
+                in
+                    ( { model | posts = List.map update model.posts }
+                    , Routing.navigateToRoute (PostViewRoute post.slug)
+                    )
 
-        LoadTags (Ok tags) ->
-            ( { model | tags = tags }, Cmd.none )
+            PostUpdate (Err _) ->
+                ( model, Cmd.none )
 
-        LoadTags (Err _) ->
-            ( model, Cmd.none )
-
-        UrlChange location ->
-            let
-                route =
-                    Routing.parse location
-            in
-                case route of
-                    Just (PostViewRoute slug) ->
-                        ( { model | currentRoute = route }
-                        , Cmd.batch [ scrollToTopCmd, setDisqusIdentifier slug ]
-                        )
-
-                    _ ->
-                        ( { model | currentRoute = route }
-                        , scrollToTopCmd
-                        )
-
-        UpdatePost post ->
-            ( { model | post = Just post }, Cmd.none )
-
-        UpdateCreds creds ->
-            ( { model | creds = creds }, Cmd.none )
-
-        ChangeRoute route ->
-            let
-                scrollAndGo =
-                    Cmd.batch [ scrollToTopCmd, Routing.navigateToRoute route ]
-            in
-                case route of
-                    PostEditRoute slug ->
-                        ( { model | post = getPostBySlug slug model.posts }
-                        , scrollAndGo
-                        )
-
-                    PostNewRoute ->
-                        ( { model | post = emptyPost }, scrollAndGo )
-
-                    _ ->
-                        ( model, scrollAndGo )
-
-        PostSaveOrCreate post ->
-            let
-                isNew =
-                    if post.id == "" then
-                        True
-                    else
-                        False
-
-                method =
-                    if isNew then
-                        postPost
-                    else
-                        updatePost
-            in
-                ( model
-                , method model.accessToken post
+            PostDelete post ->
+                ( { model | posts = List.filter (\post_ -> post_.id /= post.id) model.posts }
+                , Cmd.batch
+                    [ scrollToTopCmd
+                    , deletePost requester post
+                    , Routing.navigateToRoute PostsListRoute
+                    ]
                 )
 
-        Login ->
-            ( model, Cmd.batch [ postCreds Nothing model.creds ] )
+            LoadTags (Ok tags) ->
+                ( { model | tags = tags }, Cmd.none )
 
-        GetAccessToken (Ok token) ->
-            ( { model | accessToken = token }
-            , Cmd.batch
-                [ saveAccessTokenToLocalStorage token
-                , getPosts token
-                , getTags token
-                , Routing.navigateToRoute PostsListRoute
-                ]
-            )
+            LoadTags (Err _) ->
+                ( model, Cmd.none )
 
-        GetAccessToken (Err _) ->
-            let
-                newCreds creds =
-                    { creds | isError = True }
-            in
-                ( { model | creds = newCreds model.creds }, Cmd.none )
+            UrlChange location ->
+                let
+                    route =
+                        Routing.parse location
+                in
+                    case route of
+                        Just (PostViewRoute slug) ->
+                            ( { model | currentRoute = route }
+                            , Cmd.batch [ scrollToTopCmd, setDisqusIdentifier slug ]
+                            )
 
-        DoNothing _ ->
-            ( model, Cmd.none )
+                        _ ->
+                            ( { model | currentRoute = route }
+                            , scrollToTopCmd
+                            )
+
+            UpdatePost post ->
+                ( { model | post = Just post }, Cmd.none )
+
+            UpdateCreds creds ->
+                ( { model | creds = creds }, Cmd.none )
+
+            ChangeRoute route ->
+                let
+                    scrollAndGo =
+                        Cmd.batch [ scrollToTopCmd, Routing.navigateToRoute route ]
+                in
+                    case route of
+                        PostEditRoute slug ->
+                            ( { model | post = getPostBySlug slug model.posts }
+                            , scrollAndGo
+                            )
+
+                        PostNewRoute ->
+                            ( { model | post = emptyPost }, scrollAndGo )
+
+                        _ ->
+                            ( model, scrollAndGo )
+
+            PostSaveOrCreate post ->
+                let
+                    isNew =
+                        if post.id == "" then
+                            True
+                        else
+                            False
+
+                    method =
+                        if isNew then
+                            postPost
+                        else
+                            updatePost
+                in
+                    ( model
+                    , method requester post
+                    )
+
+            Login ->
+                ( model, Cmd.batch [ postCreds requester model.creds ] )
+
+            GetAccessToken (Ok token) ->
+                ( { model | accessToken = token }
+                , Cmd.batch
+                    [ saveAccessTokenToLocalStorage token
+                    , getPosts requester
+                    , getTags requester
+                    , Routing.navigateToRoute PostsListRoute
+                    ]
+                )
+
+            GetAccessToken (Err _) ->
+                let
+                    newCreds creds =
+                        { creds | isError = True }
+                in
+                    ( { model | creds = newCreds model.creds }, Cmd.none )
+
+            DoNothing _ ->
+                ( model, Cmd.none )
 
 
 
@@ -644,16 +654,12 @@ subscriptions model =
 -- HTTP
 
 
-makeRequest method body token endpoint message decoder =
+makeRequest apiUrl token method body endpoint message decoder =
     let
-        url =
-            "//localhost:3000/api/" ++ endpoint
-
         headers =
             case token of
                 Just token_ ->
-                    [ Http.header "Authorization" ("Bearer " ++ token_)
-                    ]
+                    [ Http.header "Authorization" ("Bearer " ++ token_) ]
 
                 Nothing ->
                     []
@@ -662,7 +668,7 @@ makeRequest method body token endpoint message decoder =
             (Http.request
                 { method = method
                 , headers = headers
-                , url = url
+                , url = apiUrl ++ endpoint
                 , body = body
                 , timeout = Nothing
                 , expect = Http.expectJson decoder
@@ -671,50 +677,68 @@ makeRequest method body token endpoint message decoder =
             )
 
 
-makePostRequest value =
-    makeRequest "POST" (Http.jsonBody value)
+makePostRequest requester value =
+    requester "POST" (Http.jsonBody value)
 
 
-makePutRequest value =
-    makeRequest "PUT" (Http.jsonBody value)
+makePutRequest requester value =
+    requester "PUT" (Http.jsonBody value)
 
 
-makeGetRequest =
-    makeRequest "GET" Http.emptyBody
+makeGetRequest requester =
+    requester "GET" Http.emptyBody
 
 
-makeDeleteRequest =
-    makeRequest "DELETE" Http.emptyBody
+makeDeleteRequest requester =
+    requester "DELETE" Http.emptyBody
 
 
-getPosts : Token -> Cmd Msg
-getPosts token =
-    makeGetRequest token "posts" LoadPosts postsDecoder
+
+-- getPosts : Token -> Cmd Msg
 
 
-postPost : Token -> Post -> Cmd Msg
-postPost token post =
-    makePostRequest (postEncoder post) token "posts" PostAdd (Decode.field "post" postDecoder)
+getPosts requester =
+    makeGetRequest requester "posts" LoadPosts postsDecoder
 
 
-deletePost : Token -> Post -> Cmd Msg
-deletePost token post =
-    makeDeleteRequest token ("posts/" ++ post.id) PostAdd (Decode.field "post" postDecoder)
+
+-- postPost : Token -> Post -> Cmd Msg
 
 
-updatePost : Token -> Post -> Cmd Msg
-updatePost token post =
-    makePutRequest (postEncoder post) token ("posts/" ++ post.id) PostUpdate (Decode.field "post" postDecoder)
+postPost requester post =
+    makePostRequest requester (postEncoder post) "posts" PostAdd (Decode.field "post" postDecoder)
 
 
-getTags : Token -> Cmd Msg
-getTags token =
-    makeGetRequest token "tags" LoadTags tagsDecoder
+
+-- deletePost : Token -> Post -> Cmd Msg
 
 
-postCreds : Token -> Credentials -> Cmd Msg
-postCreds token creds =
-    makePostRequest (credsEncoder creds) token "auth/local" GetAccessToken tokenDecoder
+deletePost requester post =
+    makeDeleteRequest requester ("posts/" ++ post.id) PostAdd (Decode.field "post" postDecoder)
+
+
+
+-- updatePost : Token -> Post -> Cmd Msg
+
+
+updatePost requester post =
+    makePutRequest requester (postEncoder post) ("posts/" ++ post.id) PostUpdate (Decode.field "post" postDecoder)
+
+
+
+-- getTags : Token -> Cmd Msg
+
+
+getTags requester =
+    makeGetRequest requester "tags" LoadTags tagsDecoder
+
+
+
+-- postCreds : Token -> Credentials -> Cmd Msg
+
+
+postCreds requester creds =
+    makePostRequest requester (credsEncoder creds) "auth/local" GetAccessToken tokenDecoder
 
 
 

@@ -30,6 +30,7 @@ type alias Model =
     , post : Maybe Post
     , creds : Credentials
     , accessToken : Token
+    , apiUrl : String
     , currentRoute : Maybe Route
     }
 

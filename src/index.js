@@ -7,8 +7,17 @@ require('highlight.js/styles/tomorrow-night-eighties.css');
 
 var Elm = require('./Main');
 
+var apiUrl;
+
+if (process.env.NODE_ENV === 'production') {
+    apiUrl = '/api/';
+} else {
+    apiUrl = '//localhost:3000/api/';
+}
+
 var app = Elm.Main.embed(document.getElementById('root'), {
-    accessToken: localStorage.getItem('access_token')
+    accessToken: localStorage.getItem('access_token'),
+    apiUrl: apiUrl
 });
 
 // var disqus_config = function () {
