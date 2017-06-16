@@ -25,7 +25,9 @@ before_script:
       fi
 
 script:
-  - "$TRAVIS_BUILD_DIR/sysconfcpus/bin/sysconfcpus -n 2; cd client; yarn build"
+  - cd $TRAVIS_BUILD_DIR/client
+  - yarn install
+  - "$TRAVIS_BUILD_DIR/sysconfcpus/bin/sysconfcpus -n 2;yarn build"
 
 addons:
   ssh_known_hosts: dev.kuzzmi.com
