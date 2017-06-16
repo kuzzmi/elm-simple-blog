@@ -26,7 +26,6 @@
     "multer": "^1.1.0",
     "node-github": "0.0.3",
     "passport": "^0.3.2",
-    "passport-google-oauth": "^0.2.0",
     "passport-http-bearer": "^1.0.1",
     "passport-jwt": "^1.2.1",
     "passport-local": "^1.0.0",
