@@ -1,0 +1,39 @@
+{
+    "apps": [
+        {
+            "name": "api-service",
+            "script": "./api/bin/www",
+            "instances": 1,
+            "env": {
+                "NODE_ENV": "production",
+                "PORT": "3000"
+            },
+            "env_staging": {
+                "NODE_ENV": "staging",
+                "PORT": "3000"
+            },
+            "env_development": {
+                "NODE_ENV": "development",
+                "PORT": "3000"
+            }
+        },
+
+        {
+            "name": "cache-service",
+            "script": "./cache/bin/www",
+            "instances": 1,
+            "env": {
+                "NODE_ENV": "production",
+                "PORT": "3300"
+            },
+            "env_staging": {
+                "NODE_ENV": "staging",
+                "PORT": "3300"
+            },
+            "env_development": {
+                "NODE_ENV": "development",
+                "PORT": "3300"
+            }
+        }
+    ]
+}
