@@ -1,40 +1,44 @@
 language: node_js
 node_js:
-    - node
+  - node
+#
+# env:
+#   - TIER=client
+#   - TIER=server
+#   - TIER=cache
 
 cache:
-    directories:
-        - node_modules
-        - elm-stuff
-        - sysconfcpus
+  directories:
+    - node_modules
+    - elm-stuff
+    - sysconfcpus
 
 before_script:
-    - npm i -g elm
-    - |
-        if [ ! -d sysconfcpus/bin ];
-        then
-        git clone https://github.com/obmarg/libsysconfcpus.git;
-        cd libsysconfcpus;
-        ./configure --prefix=$TRAVIS_BUILD_DIR/sysconfcpus;
-        make && make install;
-        cd ..;
-        fi
+  - npm i -g elm
+  - |
+      if [ ! -d sysconfcpus/bin ]; then
+          git clone https://github.com/obmarg/libsysconfcpus.git;
+          cd libsysconfcpus;
+          ./configure --prefix=$TRAVIS_BUILD_DIR/sysconfcpus;
+          make && make install;
+          cd ..;
+      fi
 
 script:
-    - "$TRAVIS_BUILD_DIR/sysconfcpus/bin/sysconfcpus -n 2; yarn build"
+  - "$TRAVIS_BUILD_DIR/sysconfcpus/bin/sysconfcpus -n 2; yarn build"
 
 addons:
-    ssh_known_hosts: dev.kuzzmi.com
+  ssh_known_hosts: dev.kuzzmi.com
 
 before_deploy:
-    - openssl aes-256-cbc -K $encrypted_b9eb5e1e460e_key -iv $encrypted_b9eb5e1e460e_iv -in deploy_rsa.enc -out /tmp/deploy_rsa -d
-    - eval "$(ssh-agent -s)"
-    - chmod 600 /tmp/deploy_rsa
-    - ssh-add /tmp/deploy_rsa
+  - openssl aes-256-cbc -K $encrypted_b9eb5e1e460e_key -iv $encrypted_b9eb5e1e460e_iv -in deploy_rsa.enc -out /tmp/deploy_rsa -d
+  - eval "$(ssh-agent -s)"
+  - chmod 600 /tmp/deploy_rsa
+  - ssh-add /tmp/deploy_rsa
 
 deploy:
-    provider: script
-    skip_cleanup: true
-    script: rsync -r --delete-after --quiet $TRAVIS_BUILD_DIR/dist/ kuzzmi@dev.kuzzmi.com:/var/www/html/dev.kuzzmi.com/
-    on:
-        branch: master
+  provider: script
+  skip_cleanup: true
+  script: rsync -r --delete-after --quiet $TRAVIS_BUILD_DIR/dist/ kuzzmi@dev.kuzzmi.com:/var/www/html/dev.kuzzmi.com/
+  on:
+    branch: master
