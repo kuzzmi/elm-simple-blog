@@ -9,12 +9,12 @@ node_js:
 
 cache:
   directories:
-    - node_modules
-    - elm-stuff
+    - client/node_modules
+    - client/elm-stuff
     - sysconfcpus
 
 before_script:
-  - npm i -g elm
+  - npm i -g elm yarn
   - |
       if [ ! -d sysconfcpus/bin ]; then
           git clone https://github.com/obmarg/libsysconfcpus.git;
@@ -39,6 +39,6 @@ before_deploy:
 deploy:
   provider: script
   skip_cleanup: true
-  script: rsync -r --delete-after --quiet $TRAVIS_BUILD_DIR/clien/dist/ kuzzmi@dev.kuzzmi.com:/var/www/html/dev.kuzzmi.com/
+  script: rsync -r --delete-after --quiet $TRAVIS_BUILD_DIR/client/dist/ kuzzmi@dev.kuzzmi.com:/var/www/html/dev.kuzzmi.com/
   on:
     branch: master
