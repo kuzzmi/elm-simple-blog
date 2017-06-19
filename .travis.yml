@@ -47,6 +47,6 @@ before_deploy:
 deploy:
   provider: script
   skip_cleanup: true
-  script: rsync -r --quiet --chmod=F650 --exclude=client $TRAVIS_BUILD_DIR/ kuzzmi@dev.kuzzmi.com:/var/www/app/dev.kuzzmi.com/api/
+  script: rsync -r --quiet --exclude=client $TRAVIS_BUILD_DIR/ kuzzmi@dev.kuzzmi.com:/var/www/app/dev.kuzzmi.com/api/
   on:
     branch: dev
