@@ -12,7 +12,7 @@
                 "NODE_ENV": "staging",
                 "PORT": "3000"
             },
-            "env_development": {
+            "env_dev": {
                 "NODE_ENV": "development",
                 "PORT": "3000"
             }
@@ -30,10 +30,23 @@
                 "NODE_ENV": "staging",
                 "PORT": "3300"
             },
-            "env_development": {
+            "env_dev": {
                 "NODE_ENV": "development",
                 "PORT": "3300"
             }
         }
-    ]
+    ],
+    "deploy": {
+        "dev": {
+            "user": "kuzzmi",
+            "host": "dev.kuzzmi.com",
+            "ref": "origin/dev",
+            "repo": "git@github.com:kuzzmi/elm-simple-blog.git",
+            "path": "/var/www/app/dev.kuzzmi.com/",
+            "post-deploy" : "cd api && yarn install && cd ../cache && yarn install && cd .. && pm2 startOrGracefulReload pm2-application.json --env dev",
+            "env": {
+                "NODE_ENV": "development"
+            }
+        }
+    }
 }
