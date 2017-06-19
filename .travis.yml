@@ -47,6 +47,6 @@ before_deploy:
 deploy:
   provider: script
   skip_cleanup: true
-  script: rsync -rR --quiet $TRAVIS_BUILD_DIR/api/ kuzzmi@dev.kuzzmi.com:/var/www/app/dev.kuzzmi.com/api/ && rsync -rR --quiet $TRAVIS_BUILD_DIR/cache/ kuzzmi@dev.kuzzmi.com:/var/www/app/dev.kuzzmi.com/cache/
+  script: scripts/deploy.sh $TRAVIS_BUILD_DIR
   on:
     branch: dev
