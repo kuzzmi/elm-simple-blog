@@ -9,7 +9,7 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 
 const IS_DIST = process.env.NODE_ENV === 'production';
-const PUBLIC_URL = 'https://dev.kuzzmi.com/';
+const PUBLIC_URL = IS_DIST ? 'https://dev.kuzzmi.com/' : '/';
 // kuzzmi.com: 'UA-51775404-4'
 const GA_PROPERTY_ID = IS_DIST ? '' : 'UA-51775404-5';
 
@@ -25,26 +25,26 @@ if (IS_DIST) {
     plugins = [
         ...plugins,
         new webpack.optimize.UglifyJsPlugin(),
-            new InterpolateHtmlPlugin({
-                PUBLIC_URL,
-                GA_PROPERTY_ID
-            }),
-            new HtmlWebpackPlugin({
-                inject: true,
-                template: paths.html,
-                minify: {
-                    removeComments: true,
-                    collapseWhitespace: true,
-                    removeRedundantAttributes: true,
-                    useShortDoctype: true,
-                    removeEmptyAttributes: true,
-                    removeStyleLinkTypeAttributes: true,
-                    keepClosingSlash: true,
-                    minifyJS: true,
-                    minifyCSS: true,
-                    minifyURLs: true,
-                },
-            }),
+        new InterpolateHtmlPlugin({
+            PUBLIC_URL,
+            GA_PROPERTY_ID
+        }),
+        new HtmlWebpackPlugin({
+            inject: true,
+            template: paths.html,
+            minify: {
+                removeComments: true,
+                collapseWhitespace: true,
+                removeRedundantAttributes: true,
+                useShortDoctype: true,
+                removeEmptyAttributes: true,
+                removeStyleLinkTypeAttributes: true,
+                keepClosingSlash: true,
+                minifyJS: true,
+                minifyCSS: true,
+                minifyURLs: true,
+            },
+        }),
         new webpack.DefinePlugin({
             'process.env.NODE_ENV': JSON.stringify('production'),
             'process.env.PUBLIC_URL': JSON.stringify(PUBLIC_URL),
@@ -64,6 +64,22 @@ if (IS_DIST) {
             minify: true,
             navigateFallback: PUBLIC_URL + 'index.html',
             staticFileGlobsIgnorePatterns: [/\.map$/, /asset-manifest\.json$/]
+        }),
+        new CopyWebpackPlugin([
+            { from: './public/favicon.ico' },
+            { from: './public/manifest.json' }
+        ])
+    ];
+} else {
+    plugins = [
+        ...plugins,
+        new InterpolateHtmlPlugin({
+            PUBLIC_URL,
+            GA_PROPERTY_ID
+        }),
+        new HtmlWebpackPlugin({
+            inject: true,
+            template: paths.html
         }),
         new CopyWebpackPlugin([
             { from: './public/favicon.ico' },
