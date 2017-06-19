@@ -11,6 +11,8 @@ cache:
   directories:
     - client/node_modules
     - client/elm-stuff
+    - cache/node_modules
+    - api/node_modules
     - sysconfcpus
 
 before_script:
