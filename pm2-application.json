@@ -35,18 +35,5 @@
                 "PORT": "3300"
             }
         }
-    ],
-    "deploy": {
-        "dev": {
-            "user": "kuzzmi",
-            "host": "dev.kuzzmi.com",
-            "ref": "origin/dev",
-            "repo": "git@github.com:kuzzmi/elm-simple-blog.git",
-            "path": "/var/www/app/dev.kuzzmi.com/",
-            "post-deploy" : "npm install -p yarn && cd api && yarn install && cd ../cache && yarn install && cd .. && pm2 startOrGracefulReload pm2-application.json --env dev",
-            "env": {
-                "NODE_ENV": "development"
-            }
-        }
-    }
+    ]
 }
