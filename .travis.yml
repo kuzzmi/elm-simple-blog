@@ -30,9 +30,9 @@ script:
   - cd $TRAVIS_BUILD_DIR/client
   - yarn install
   - cd $TRAVIS_BUILD_DIR/cache
-  - npm install
+  - yarn install
   - cd $TRAVIS_BUILD_DIR/api
-  - npm install
+  - yarn install
 #   - "$TRAVIS_BUILD_DIR/sysconfcpus/bin/sysconfcpus -n 2;yarn build"
 
 addons:
