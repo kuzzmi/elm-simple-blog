@@ -7,6 +7,7 @@ var config = require('../../config/config');
 var multer = require('multer');
 var upload = multer({ dest: config.uploadPath });
 
+
 router.post('/', auth.hasRole('admin'), posts.add);
 router.get('/count', posts.getCount);
 router.get('/', auth.hasRoleNotStrict('admin'), posts.getAll);
