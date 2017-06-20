@@ -16,7 +16,7 @@ cache:
     - sysconfcpus
 
 before_script:
-  - npm i -g elm yarn
+  - npm i -g yarn
   # - |
   #     if [ ! -d sysconfcpus/bin ]; then
   #         git clone https://github.com/obmarg/libsysconfcpus.git;
