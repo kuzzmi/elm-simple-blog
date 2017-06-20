@@ -27,9 +27,7 @@ before_script:
   #     fi
 
 script:
-  - cd $TRAVIS_BUILD_DIR/$TIER
-  - yarn install
-  # - "$TRAVIS_BUILD_DIR/sysconfcpus/bin/sysconfcpus -n 2;yarn build"
+  - scripts/build_$TIER.sh $TRAVIS_BUILD_DIR $TIER
 
 addons:
   ssh_known_hosts: dev.kuzzmi.com
@@ -43,7 +41,6 @@ before_deploy:
 deploy:
   provider: script
   skip_cleanup: true
-  script: bash $TRAVIS_BUILD_DIR/scripts/deploy.sh $TRAVIS_BUILD_DIR $TIER
-# rsync -r --quiet $TRAVIS_BUILD_DIR/$TIER $TRAVIS_BUILD_DIR/pm2-application.json kuzzmi@dev.kuzzmi.com:/var/www/app/dev.kuzzmi.com/
+  script: bash $TRAVIS_BUILD_DIR/scripts/deploy_$TIER.sh $TRAVIS_BUILD_DIR $TIER
   on:
     branch: dev
