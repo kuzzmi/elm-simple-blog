@@ -17,17 +17,17 @@ cache:
 
 before_script:
   - npm i -g yarn
-  # - |
-  #     if [ ! -d sysconfcpus/bin ]; then
-  #         git clone https://github.com/obmarg/libsysconfcpus.git;
-  #         cd libsysconfcpus;
-  #         ./configure --prefix=$TRAVIS_BUILD_DIR/sysconfcpus;
-  #         make && make install;
-  #         cd ..;
-  #     fi
+  - |
+      if [ ! -d sysconfcpus/bin ]; then
+          git clone https://github.com/obmarg/libsysconfcpus.git;
+          cd libsysconfcpus;
+          ./configure --prefix=$TRAVIS_BUILD_DIR/sysconfcpus;
+          make && make install;
+          cd ..;
+      fi
 
 script:
-  - scripts/build_$TIER.sh $TRAVIS_BUILD_DIR $TIER
+  - { scripts/build_$TIER.sh $TRAVIS_BUILD_DIR $TIER; true }
 
 addons:
   ssh_known_hosts: dev.kuzzmi.com
