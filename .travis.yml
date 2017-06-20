@@ -4,7 +4,7 @@ node_js:
 
 env:
   - TIER=client
-  - TIER=server
+  - TIER=api
   - TIER=cache
 
 cache:
@@ -17,14 +17,14 @@ cache:
 
 before_script:
   - npm i -g elm yarn
-  - |
-      if [ ! -d sysconfcpus/bin ]; then
-          git clone https://github.com/obmarg/libsysconfcpus.git;
-          cd libsysconfcpus;
-          ./configure --prefix=$TRAVIS_BUILD_DIR/sysconfcpus;
-          make && make install;
-          cd ..;
-      fi
+  # - |
+  #     if [ ! -d sysconfcpus/bin ]; then
+  #         git clone https://github.com/obmarg/libsysconfcpus.git;
+  #         cd libsysconfcpus;
+  #         ./configure --prefix=$TRAVIS_BUILD_DIR/sysconfcpus;
+  #         make && make install;
+  #         cd ..;
+  #     fi
 
 script:
   - cd $TRAVIS_BUILD_DIR/$TIER
