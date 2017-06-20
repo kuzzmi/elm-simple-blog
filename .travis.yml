@@ -43,6 +43,7 @@ before_deploy:
 deploy:
   provider: script
   skip_cleanup: true
-  script: rsync -r --quiet $TRAVIS_BUILD_DIR/$TIER $TRAVIS_BUILD_DIR/pm2-application.json kuzzmi@dev.kuzzmi.com:/var/www/app/dev.kuzzmi.com/
+  script: ./scripts/deploy.sh
+# rsync -r --quiet $TRAVIS_BUILD_DIR/$TIER $TRAVIS_BUILD_DIR/pm2-application.json kuzzmi@dev.kuzzmi.com:/var/www/app/dev.kuzzmi.com/
   on:
     branch: dev
