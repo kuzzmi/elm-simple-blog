@@ -14,6 +14,7 @@ type Styles
     | Logo
     | NavOption
     | TagStyle
+    | LightButtonStyle
     | ButtonStyle
     | TextInputStyle
     | LabelStyle
@@ -92,6 +93,13 @@ stylesheet =
             , hover
                 [ Color.text orange
                 , Font.underline
+                ]
+            ]
+        , style LightButtonStyle
+            [ Color.text Color.darkGrey
+            , Style.cursor "pointer"
+            , hover
+                [ Color.text orange
                 ]
             ]
         , style ButtonStyle

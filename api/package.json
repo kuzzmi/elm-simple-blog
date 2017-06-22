@@ -1,9 +1,10 @@
 {
   "name": "server",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
-    "start": "node ./bin/www"
+    "start": "node ./bin/www",
+    "migrate": "migrate -d mongodb://localhost/blog"
   },
   "dependencies": {
     "body-parser": "~1.13.2",
@@ -20,6 +21,7 @@
     "jade": "~1.11.0",
     "jsonwebtoken": "^5.4.1",
     "marked": "^0.3.5",
+    "migrate-mongoose": "^3.2.2",
     "mongoose": "^4.10.7",
     "morgan": "~1.6.1",
     "multer": "^1.1.0",

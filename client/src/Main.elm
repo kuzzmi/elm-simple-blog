@@ -18,6 +18,7 @@ import Models exposing (..)
 import Routing
 import Api
 import Msg exposing (..)
+import Color
 
 
 {-| This is used to update page identificator of the page for disqus
@@ -78,11 +79,16 @@ init flags location =
                 , password = ""
                 , isError = False
                 }
+          , projects = []
           , accessToken = flags.accessToken
           , apiUrl = flags.apiUrl
           , currentRoute = Routing.parse location
           }
-        , Cmd.batch [ Api.getPosts requester, Api.getTags requester ]
+        , Cmd.batch
+            [ Api.getPosts requester
+            , Api.getTags requester
+            , Api.getProjects requester
+            ]
         )
 
 
@@ -141,6 +147,12 @@ update msg model =
                     ]
                 )
 
+            LoadProjects (Ok projects) ->
+                ( { model | projects = projects }, Cmd.none )
+
+            LoadProjects (Err _) ->
+                ( model, Cmd.none )
+
             LoadTags (Ok tags) ->
                 ( { model | tags = tags }, Cmd.none )
 
@@ -163,9 +175,20 @@ update msg model =
                             , scrollToTopCmd
                             )
 
-            UpdatePost post ->
-                ( { model | post = Just post }, Cmd.none )
+            -- post form
+            UpdatePostTitle post title ->
+                ( { model | post = Just { post | title = title } }, Cmd.none )
 
+            UpdatePostDescription post description ->
+                ( { model | post = Just { post | description = description } }, Cmd.none )
+
+            UpdatePostMarkdown post markdown ->
+                ( { model | post = Just { post | markdown = markdown } }, Cmd.none )
+
+            UpdatePostIsPublished post isPublished ->
+                ( { model | post = Just { post | isPublished = isPublished } }, Cmd.none )
+
+            -- auth
             UpdateCreds creds ->
                 ( { model | creds = creds }, Cmd.none )
 
@@ -212,6 +235,7 @@ update msg model =
                 , Cmd.batch
                     [ saveAccessTokenToLocalStorage token
                     , Api.getPosts requester
+                    , Api.getProjects requester
                     , Api.getTags requester
                     , Routing.navigateToRoute PostsListRoute
                     ]
@@ -308,7 +332,7 @@ viewContent model =
                 [ viewPostEdit isAuthorized model.post ]
 
             Just ProjectsListRoute ->
-                [ viewLogin isAuthorized model.creds ]
+                [ viewProjectsList isAuthorized model.projects ]
 
             Just AboutRoute ->
                 [ viewAbout isAuthorized ]
@@ -327,10 +351,6 @@ viewContent model =
 viewLogin : Bool -> Credentials -> Element Styles Variations Msg
 viewLogin isAuthorized creds =
     let
-        input inputElement variations label_ value =
-            label LabelStyle [] (text label_) <|
-                inputElement TextInputStyle ((paddingXY 0 5) :: variations) value
-
         updatePassword password =
             UpdateCreds { creds | password = password }
 
@@ -343,10 +363,41 @@ viewLogin isAuthorized creds =
                 [ spacing 5 ]
                 [ paragraph PostTitle [] [ text "Login" ]
                 ]
-            , when (creds.isError == True) (el ErrorStyle [ paddingXY 20 10 ] (text "Looks like credentials are not correct or there is another problem"))
-            , input inputText [ onInput updateUsername ] "Username" creds.username
-            , input inputText [ onInput updatePassword ] "Password" creds.password
-            , el None [ center ] (viewButton "Login" Login)
+            , viewError creds.isError "Looks like credentials are not correct or there is another problem"
+            , input TextInput [ onInput updateUsername ] "Username" creds.username
+            , input PasswordInput [ onInput updatePassword ] "Password" creds.password
+            , el None [ center ] (viewButtonText ButtonStyle [] "Login" Login)
+            ]
+
+
+
+-- PROJECT VIEWS
+
+
+viewProjectsListItem : Bool -> Project -> Element Styles Variations Msg
+viewProjectsListItem isAuthorized project =
+    column None
+        [ spacing 5, width (percent 50) ]
+        [ image project.imageUrl None [] (text (project.name ++ " image"))
+        , el PostTitle [ vary Link True ] (text project.name) |> link project.url
+        , paragraph None [] [ text project.description ]
+        , viewIconLabeled LightButtonStyle "favorite_border" (toString project.stars)
+        ]
+
+
+viewProjectsList : Bool -> List Project -> Element Styles Variations Msg
+viewProjectsList isAuthorized projects =
+    let
+        viewProjectsListItem_ =
+            viewProjectsListItem isAuthorized
+    in
+        column None
+            [ spacing 50 ]
+            [ viewButtonsRow (isAuthorized)
+                [ viewButtonText ButtonStyle [ paddingXY 10 0 ] "new project" (ChangeRoute PostNewRoute)
+                , viewButtonText ButtonStyle [ paddingXY 10 0 ] "sync projects" (ChangeRoute PostNewRoute)
+                ]
+            , wrappedRow None [ spacing 100 ] (List.map viewProjectsListItem_ projects)
             ]
 
 
@@ -362,10 +413,7 @@ viewPost isAuthorized post =
                 [ spacing 5 ]
                 [ viewPostMeta isAuthorized
                     post
-                    [ viewLink ButtonStyle [ paddingXY 10 0 ] "edit" (PostEditRoute post.slug)
-                    , when (post.isPublished == False) (viewButton "publish" (PostSaveOrCreate { post | isPublished = not post.isPublished }))
-                    , when (post.isPublished == True) (viewButton "unpublish" (PostSaveOrCreate { post | isPublished = not post.isPublished }))
-                    , viewButton "delete" (PostDelete post)
+                    [ viewButtonText ButtonStyle [] "edit" (ChangeRoute <| PostEditRoute post.slug)
                     ]
                 , paragraph PostTitle [ vary Link False ] [ text post.title ]
                 , el None
@@ -376,49 +424,20 @@ viewPost isAuthorized post =
                 |> article
 
         Nothing ->
-            column None
-                [ spacing 10 ]
-                [ paragraph PostTitle [] [ text "Nothing found" ] ]
+            viewNothingFound
 
 
 viewPostEdit : Bool -> Maybe Post -> Element Styles Variations Msg
 viewPostEdit isAuthorized post =
     let
-        input inputElement variations label_ value =
-            label LabelStyle [] (text label_) <|
-                inputElement TextInputStyle ((paddingXY 0 5) :: variations) value
+        togglePublish post =
+            PostSaveOrCreate { post | isPublished = not post.isPublished }
 
-        updateMarkdown markdown =
-            case post of
-                Just post_ ->
-                    UpdatePost { post_ | markdown = markdown }
-
-                Nothing ->
-                    DoNothing ""
-
-        updateDescription description =
-            case post of
-                Just post_ ->
-                    UpdatePost { post_ | description = description }
-
-                Nothing ->
-                    DoNothing ""
-
-        updateTitle title =
-            case post of
-                Just post_ ->
-                    UpdatePost { post_ | title = title }
-
-                Nothing ->
-                    DoNothing ""
-
-        updateIsPublished =
-            case post of
-                Just post_ ->
-                    UpdatePost { post_ | isPublished = not post_.isPublished }
-
-                Nothing ->
-                    DoNothing ""
+        publishButton post =
+            if post.isPublished then
+                viewButtonText ButtonStyle [] "unpublish" (togglePublish post)
+            else
+                viewButtonText ButtonStyle [] "publish" (togglePublish post)
     in
         case post of
             Just post ->
@@ -428,18 +447,20 @@ viewPostEdit isAuthorized post =
                         [ spacing 5 ]
                         [ viewPostMeta isAuthorized
                             post
-                            [ viewButton "save" (PostSaveOrCreate post)
-                            , when (post.isPublished == False) (viewButton "publish" (PostSaveOrCreate { post | isPublished = not post.isPublished }))
-                            , when (post.isPublished == True) (viewButton "unpublish" (PostSaveOrCreate { post | isPublished = not post.isPublished }))
+                            [ viewButtonText ButtonStyle [] "save" (PostSaveOrCreate post)
+                            , viewButtonText ButtonStyle [] "cancel" (ChangeRoute PostsListRoute)
+                            , when (String.length post.id > 0) (publishButton post)
+                            , when (String.length post.id > 0) (viewButtonText ButtonStyle [] "delete" (PostDelete post))
                             ]
                         , paragraph PostTitle [] [ text "Edit Post" ]
                         ]
-                    , input inputText [ onInput updateTitle ] "Title" post.title
-                    , el None [] (text "Is Published?") |> checkbox post.isPublished None [ onClick updateIsPublished ]
-                    , input textArea [ onInput updateDescription ] "Description" post.description
-                    , input inputText [] "Project" post.title
-                    , input inputText [] "Tags" post.title
-                    , input textArea [ rows 25, onInput updateMarkdown ] "Body" post.markdown
+                    , input TextInput [ onInput (UpdatePostTitle post) ] "Title" post.title
+                    , input TextAreaInput [ onInput (UpdatePostDescription post) ] "Description" post.description
+                    , input TextInput [] "Project" post.title
+                    , input TextInput [] "Tags" post.title
+
+                    --    , input "text" [ onInput updateUsername ] "Username" creds.username
+                    , input TextAreaInput [ rows 25, onInput (UpdatePostMarkdown post) ] "Body" post.markdown
                     ]
 
             Nothing ->
@@ -450,15 +471,66 @@ viewPostEdit isAuthorized post =
 
 viewPostStatus : Bool -> Element Styles Variations Msg
 viewPostStatus isPublished =
-    when (isPublished == False) (el ErrorStyle [ paddingXY 10 0 ] (text "DRAFT"))
+    when (isPublished == False) (el LabelStyle [] (text "DRAFT"))
 
 
-viewLink style attributes label route =
-    el style ((onClick (ChangeRoute route)) :: attributes) (text label) |> node "a"
+viewClickable style attributes msg content =
+    el style (onClick msg :: attributes) content
 
 
-viewButton label msg =
-    el ButtonStyle [ paddingXY 10 0, onClick msg ] (text label)
+viewButtonText style attributes label msg =
+    viewClickable style (paddingXY 10 0 :: attributes) msg (text label)
+
+
+viewButtonIconText style icon label msg =
+    viewClickable style [ paddingXY 10 0 ] msg (viewIconLabeled None icon label)
+
+
+viewButtonIcon style icon msg =
+    viewClickable style [ paddingXY 10 0 ] msg (viewIcon None icon)
+
+
+viewIcon style iconName =
+    el style [ class "material-icons" ] (text iconName) |> node "i"
+
+
+viewIconLabeled iconStyle iconName label =
+    row None
+        [ verticalCenter, spacing 10 ]
+        [ viewIcon iconStyle iconName
+        , el None [] (text label)
+        ]
+
+
+viewButtonsRow when_ buttons =
+    when when_ (row None [ spacing 10 ] buttons)
+
+
+viewError when_ text_ =
+    when when_ <| el ErrorStyle [ paddingXY 20 10 ] (text text_)
+
+
+type InputType
+    = TextInput
+    | PasswordInput
+    | TextAreaInput
+
+
+input inputType variations label_ value_ =
+    case inputType of
+        TextInput ->
+            label LabelStyle [] (text label_) <|
+                node "input" <|
+                    el TextInputStyle (paddingXY 0 5 :: type_ "text" :: value value_ :: variations) empty
+
+        PasswordInput ->
+            label LabelStyle [] (text label_) <|
+                node "input" <|
+                    el TextInputStyle (paddingXY 0 5 :: type_ "password" :: value value_ :: variations) empty
+
+        TextAreaInput ->
+            label LabelStyle [] (text label_) <|
+                textArea TextInputStyle (paddingXY 0 5 :: variations) value_
 
 
 viewPostMeta : Bool -> Post -> List (Element Styles Variations Msg) -> Element Styles Variations Msg
@@ -466,11 +538,11 @@ viewPostMeta isAuthorized post buttons =
     row None
         [ justify ]
         [ row None
-            [ spacing 10 ]
+            [ spacing 30 ]
             [ viewPostStatus post.isPublished
             , el None [] (Date.toFormattedString "MMMM ddd, y" post.dateCreated |> text)
             ]
-        , when (isAuthorized == True) (row None [ spacing 10 ] buttons)
+        , viewButtonsRow isAuthorized buttons
         ]
 
 
@@ -484,12 +556,16 @@ viewPostsListItem isAuthorized post =
         [ spacing 5 ]
         [ viewPostMeta isAuthorized
             post
-            [ viewLink ButtonStyle [ paddingXY 10 0 ] "edit" (PostEditRoute post.slug)
-            , viewButton "delete" (PostDelete post)
+            [ viewButtonText ButtonStyle [] "edit" (ChangeRoute <| PostEditRoute post.slug)
             ]
-        , viewLink PostTitle [ vary Link True ] post.title (PostViewRoute post.slug)
-        , paragraph None [] [ text post.description ]
+        , viewClickable PostTitle [ vary Link True ] (ChangeRoute <| PostViewRoute post.slug) (text post.title)
+        , paragraph None [ paddingBottom 10 ] [ text post.description ]
         , viewTags post.tags
+        , row None
+            [ spacing 30 ]
+            [ viewIconLabeled LightButtonStyle "favorite_border" "9"
+            , viewIconLabeled LightButtonStyle "chat_bubble_outline" "12"
+            ]
         ]
 
 
@@ -501,9 +577,19 @@ viewPostsList isAuthorized posts =
     in
         column None
             [ spacing 50 ]
-            [ when (isAuthorized == True) (el None [ alignLeft ] (viewLink ButtonStyle [ paddingXY 10 0 ] "new post" PostNewRoute))
+            [ when (isAuthorized == True)
+                (el None
+                    [ alignLeft ]
+                    (viewButtonText ButtonStyle [ paddingXY 10 0 ] "new post" (ChangeRoute PostNewRoute))
+                )
             , column None [ spacing 100 ] (List.map viewPostsListItem_ posts)
             ]
+
+
+viewNothingFound =
+    el None
+        []
+        (paragraph PostTitle [] [ text "Nothing found" ])
 
 
 viewPostsListByTag : Bool -> Maybe Tag -> List Post -> Element Styles Variations Msg
@@ -511,19 +597,14 @@ viewPostsListByTag isAuthorized tag posts =
     case tag of
         Just tag ->
             column None
-                [ spacing 10 ]
-                [ row None
-                    [ spacing 20 ]
-                    [ paragraph None [] [ text "Posts by tag" ]
-                    , viewTag tag
-                    ]
+                [ spacing 10, center ]
+                [ --viewIconLabeled LightButtonStyle "label_outline" tag.name
+                  row None [ verticalCenter, spacing 20 ] [ text "All posts by label:", viewTag tag ]
                 , viewPostsList isAuthorized posts
                 ]
 
         Nothing ->
-            column None
-                [ spacing 10 ]
-                [ paragraph PostTitle [] [ text "Nothing found" ] ]
+            viewNothingFound
 
 
 viewTagsList : List Tag -> Element Styles Variations Msg
@@ -535,7 +616,7 @@ viewTagsList tags =
 
 viewTag : Tag -> Element Styles Variations Msg
 viewTag tag =
-    viewLink TagStyle [ paddingXY 10 0 ] tag.name (PostsListByTagRoute tag.id)
+    viewButtonText TagStyle [ paddingXY 10 0 ] tag.name (ChangeRoute <| PostsListByTagRoute tag.id)
 
 
 viewTags : List Tag -> Element Styles Variations Msg
@@ -583,17 +664,17 @@ viewHeader isAuthorized currentRoute =
             Routing.isRouteActive currentRoute route
 
         navLink label route =
-            viewLink NavOption [ vary Active (isActive route), paddingXY 15 0 ] label route
+            viewButtonText NavOption [ vary Active (isActive route), paddingXY 15 0 ] label (ChangeRoute route)
     in
-        el None
+        row None
             [ justify ]
-            (row None
+            [ row None
                 [ paddingTop 80, paddingBottom 80, spacing 40 ]
-                [ viewLink Logo [] "igor kuzmenko_" PostsListRoute
+                [ viewButtonText Logo [] "igor kuzmenko_" (ChangeRoute PostsListRoute)
                 , row None
                     [ spacing 40 ]
                     [ navLink "blog" PostsListRoute
-                    , navLink "projects" AboutRoute
+                    , navLink "projects" ProjectsListRoute
                     , navLink "about" AboutRoute
                     , when (isAuthorized == False) (navLink "login" LoginRoute)
                     ]
@@ -601,7 +682,15 @@ viewHeader isAuthorized currentRoute =
 
                 -- , el NavOption [] (text "rss") |> link "http://feeds.feedburner.com/kuzzmi"
                 ]
-            )
+            , viewButtonIconText ButtonStyle "create" "a" (ChangeRoute PostsListRoute)
+                |> below
+                    [ el ButtonStyle [ width (px 40), height (px 40) ] empty
+                        |> below
+                            [ el ButtonStyle [ width (px 40), height (px 40) ] empty
+                                |> below [ el ButtonStyle [ width (px 40), height (px 40) ] empty ]
+                            ]
+                    ]
+            ]
 
 
 viewFooter : Element Styles variation msg

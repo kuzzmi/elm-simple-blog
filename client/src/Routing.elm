@@ -81,6 +81,9 @@ isRouteActive route parentRoute =
         ( Just (PostEditRoute _), PostsListRoute ) ->
             True
 
+        ( Just ProjectsListRoute, ProjectsListRoute ) ->
+            True
+
         ( Just AboutRoute, AboutRoute ) ->
             True
 

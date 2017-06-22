@@ -13,11 +13,17 @@ type Msg
     | PostUpdate (Result Http.Error Post)
     | PostDelete Post
     | PostSaveOrCreate Post
+      -- projects CRUD operations
+    | LoadProjects (Result Http.Error (List Project))
       -- auth
     | GetAccessToken (Result Http.Error Token)
     | Login
-      -- forms
-    | UpdatePost Post
+      -- post form
+    | UpdatePostTitle Post String
+    | UpdatePostMarkdown Post String
+    | UpdatePostIsPublished Post Bool
+    | UpdatePostDescription Post String
+      -- auth
     | UpdateCreds Credentials
       -- routing
     | ChangeRoute Route

@@ -4,6 +4,7 @@ var Schema = mongoose.Schema;
 var ProjectSchema = new Schema({
     name: String,
     url: String,
+    imageUrl: String,
     description: String,
     githubID: Number,
     dateCreated: Date,

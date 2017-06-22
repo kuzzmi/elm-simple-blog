@@ -48,48 +48,28 @@ makeDeleteRequest requester =
     requester "DELETE" Http.emptyBody
 
 
-
--- getPosts : Token -> Cmd Msg
-
-
 getPosts requester =
     makeGetRequest requester "posts" LoadPosts postsDecoder
-
-
-
--- postPost : Token -> Post -> Cmd Msg
 
 
 postPost requester post =
     makePostRequest requester (postEncoder post) "posts" PostAdd (Decode.field "post" postDecoder)
 
 
-
--- deletePost : Token -> Post -> Cmd Msg
-
-
 deletePost requester post =
     makeDeleteRequest requester ("posts/" ++ post.id) PostAdd (Decode.field "post" postDecoder)
-
-
-
--- updatePost : Token -> Post -> Cmd Msg
 
 
 updatePost requester post =
     makePutRequest requester (postEncoder post) ("posts/" ++ post.id) PostUpdate (Decode.field "post" postDecoder)
 
 
-
--- getTags : Token -> Cmd Msg
-
-
 getTags requester =
     makeGetRequest requester "tags" LoadTags tagsDecoder
 
 
-
--- postCreds : Token -> Credentials -> Cmd Msg
+getProjects requester =
+    makeGetRequest requester "projects" LoadProjects projectsDecoder
 
 
 postCreds requester creds =
@@ -163,6 +143,31 @@ postEncoder post =
         ]
 
 
+postsDecoder : Decode.Decoder (List Post)
+postsDecoder =
+    Decode.field "posts" (Decode.list postDecoder)
+
+
+projectDecoder : Decode.Decoder Project
+projectDecoder =
+    decode Project
+        |> Pipeline.required "_id" Decode.string
+        |> Pipeline.required "dateCreated" dateDecoder
+        |> Pipeline.required "description" (Decode.map (Maybe.withDefault "") (Decode.nullable Decode.string))
+        |> Pipeline.required "githubID" Decode.int
+        |> Pipeline.required "isOwner" Decode.bool
+        |> Pipeline.required "isPublished" Decode.bool
+        |> Pipeline.required "name" Decode.string
+        |> Pipeline.required "stars" Decode.int
+        |> Pipeline.required "url" Decode.string
+        |> Pipeline.required "imageUrl" (Decode.map (Maybe.withDefault "") (Decode.nullable Decode.string))
+
+
+projectsDecoder : Decode.Decoder (List Project)
+projectsDecoder =
+    Decode.field "projects" (Decode.list projectDecoder)
+
+
 credsEncoder : Credentials -> Encode.Value
 credsEncoder creds =
     Encode.object
@@ -175,11 +180,6 @@ tokenDecoder : Decode.Decoder Token
 tokenDecoder =
     Decode.field "access_token"
         (Decode.nullable Decode.string)
-
-
-postsDecoder : Decode.Decoder (List Post)
-postsDecoder =
-    Decode.field "posts" (Decode.list postDecoder)
 
 
 tagsDecoder : Decode.Decoder (List Tag)
