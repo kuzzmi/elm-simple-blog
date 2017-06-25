@@ -31,7 +31,7 @@ install:
   - yarn install
 
 script:
-  - "$TRAVIS_BUILD_DIR/scripts/build_$TIER.sh $TRAVIS_BUILD_DIR $TIER; true"
+  - $TRAVIS_BUILD_DIR/scripts/build_$TIER.sh $TRAVIS_BUILD_DIR $TIER
 
 addons:
   ssh_known_hosts: dev.kuzzmi.com
