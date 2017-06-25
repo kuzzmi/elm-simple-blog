@@ -27,7 +27,7 @@ before_script:
       fi
 
 script:
-  - "scripts/build_$TIER.sh $TRAVIS_BUILD_DIR $TIER; true"
+  - travis_wait "scripts/build_$TIER.sh $TRAVIS_BUILD_DIR $TIER; true"
 
 addons:
   ssh_known_hosts: dev.kuzzmi.com
