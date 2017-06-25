@@ -62,11 +62,7 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Routes
-if (app.get('env') === 'development') {
-    app.use('/api', require('./api'));
-} else {
-    app.use('/', require('./api'));
-}
+app.use('/api', require('./api'));
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
