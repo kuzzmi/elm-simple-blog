@@ -160,7 +160,10 @@ projectDecoder =
         |> Pipeline.required "name" Decode.string
         |> Pipeline.required "stars" Decode.int
         |> Pipeline.required "url" Decode.string
-        |> Pipeline.required "imageUrl" (Decode.map (Maybe.withDefault "") (Decode.nullable Decode.string))
+
+
+
+-- |> Pipeline.required "imageUrl" (Decode.map (Maybe.withDefault "") (Decode.nullable Decode.string))
 
 
 projectsDecoder : Decode.Decoder (List Project)

@@ -7,6 +7,10 @@ require('highlight.js/styles/tomorrow-night-eighties.css');
 
 var Elm = require('./Main');
 
+var disqusLoaded = false;
+var a2a_config = a2a_config || {};
+a2a_config.onclick = 1;
+
 var apiUrl;
 
 if (process.env.NODE_ENV === 'production') {
@@ -20,30 +24,44 @@ var app = Elm.Main.embed(document.getElementById('root'), {
     apiUrl: apiUrl
 });
 
-// var disqus_config = function () {
-//     this.page.url = PAGE_URL;  // Replace PAGE_URL with your page's canonical URL variable
-//     this.page.identifier = PAGE_IDENTIFIER; // Replace PAGE_IDENTIFIER with your page's unique identifier variable
-// };
-//
-// (function() { // DON'T EDIT BELOW THIS LINE
-//     var d = document, s = d.createElement('script');
-//     s.src = 'https://kuzzmi.disqus.com/embed.js';
-//     s.setAttribute('data-timestamp', +new Date());
-//     (d.head || d.body).appendChild(s);
-// })();
-//
-//
-
 app.ports.saveAccessTokenToLocalStorage.subscribe(function(accessToken) {
-    console.log('GOT ACCESS TOKEN', accessToken);
     localStorage.setItem('access_token', accessToken);
 });
 
 app.ports.setDisqusIdentifier.subscribe(function(slug) {
-    console.log('GOT NEW DISQUS SLUG', slug);
+    if (window.DISQUS) {
+        window.DISQUS.reset();
+    }
+
     setTimeout(function() {
         document.querySelectorAll('pre code').forEach(function(block) {
             hljs.highlightBlock(block);
         });
-    }, 100);
+        if (disqusLoaded) {
+            window.DISQUS.host._loadEmbed();
+            a2a.init('page');
+        }
+   }, 100);
+
+    var disqus_config = function() {
+        this.page.url = window.location.href;
+        this.page.identifier = slug;
+    };
+
+    a2a_config.linkurl = window.location.href;
+    a2a_config.linkname = slug;
+
+    if (!disqusLoaded) {
+        var loadScript = function(url) {
+            var d = document, s = d.createElement('script');
+            s.src = url;
+            s.setAttribute('data-timestamp', +new Date());
+            s.setAttribute('async', true);
+            disqusLoaded = true;
+            (d.head || d.body).appendChild(s);
+        };
+        loadScript('https://kuzzmi.disqus.com/embed.js');
+        // loadScript('https://kuzzmi.disqus.com/count.js');
+        loadScript('//static.addtoany.com/menu/page.js');
+    }
 });

@@ -76,7 +76,8 @@ type alias Project =
     , name : String
     , stars : Int
     , url : String
-    , imageUrl : String
+
+    -- , imageUrl : String
     }
 
 

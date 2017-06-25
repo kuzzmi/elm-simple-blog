@@ -70,6 +70,17 @@ init flags location =
     let
         requester =
             Api.makeRequest flags.apiUrl flags.accessToken
+
+        route =
+            Routing.parse location
+
+        navigateTo route =
+            case route of
+                Just route_ ->
+                    Routing.navigateToRoute route_
+
+                Nothing ->
+                    Routing.navigateToRoute PostsListRoute
     in
         ( { posts = []
           , tags = []
@@ -82,12 +93,13 @@ init flags location =
           , projects = []
           , accessToken = flags.accessToken
           , apiUrl = flags.apiUrl
-          , currentRoute = Routing.parse location
+          , currentRoute = Nothing
           }
         , Cmd.batch
             [ Api.getPosts requester
             , Api.getTags requester
             , Api.getProjects requester
+            , navigateTo route
             ]
         )
 
@@ -381,7 +393,7 @@ viewProjectsListItem isAuthorized project =
         [ -- image project.imageUrl None [] (text (project.name ++ " image")),
           el PostTitle [ vary Link True ] (text project.name) |> link project.url
         , paragraph None [] [ text project.description ]
-        , viewIconLabeled LightButtonStyle "favorite_border" (toString project.stars)
+        , viewIconLabeled LabelStyle "grade" (toString project.stars)
         ]
 
 
@@ -393,7 +405,7 @@ viewProjectsList isAuthorized projects =
     in
         column None
             [ spacing 50 ]
-            [ viewButtonsRow (isAuthorized)
+            [ viewButtonsRow isAuthorized
                 [ viewButtonText ButtonStyle [ paddingXY 10 0 ] "new project" (ChangeRoute PostNewRoute)
                 , viewButtonText ButtonStyle [ paddingXY 10 0 ] "sync projects" (ChangeRoute PostNewRoute)
                 ]
@@ -418,13 +430,32 @@ viewPost isAuthorized post =
                 , paragraph PostTitle [ vary Link False ] [ text post.title ]
                 , el None
                     [ width (px 900), class "post-body" ]
-                    (viewPostBody post.body |> html)
+                    (viewPostBody post.body)
                 , viewTags post.tags
+                , when post.isPublished <| row None [ center, paddingXY 0 20 ] [ viewA2A ]
+                , when post.isPublished <| el None [ id "disqus_thread" ] empty
                 ]
                 |> article
 
         Nothing ->
             viewNothingFound
+
+
+viewA2A =
+    let
+        a2a =
+            """
+            <div class="a2a_kit a2a_kit_size_32 a2a_default_style a2a_kit-bottom" data-a2a-icon-color="#FF8300">
+                <a class="a2a_button_facebook a2a_counter"></a>
+                <a class="a2a_button_twitter a2a_counter"></a>
+                <a class="a2a_button_google_plus a2a_counter"></a>
+                <a class="a2a_button_reddit a2a_counter"></a>
+                <a class="a2a_button_linkedin a2a_counter"></a>
+                <a class="a2a_button_pocket a2a_counter"></a>
+            </div>
+            """
+    in
+        Html.div [ (Html.Attributes.property "innerHTML" (Encode.string a2a)) ] [] |> html
 
 
 viewPostEdit : Bool -> Maybe Post -> Element Styles Variations Msg
@@ -561,11 +592,12 @@ viewPostsListItem isAuthorized post =
         , viewClickable PostTitle [ vary Link True ] (ChangeRoute <| PostViewRoute post.slug) (text post.title)
         , paragraph None [ paddingBottom 10 ] [ text post.description ]
         , viewTags post.tags
-        , row None
-            [ spacing 30 ]
-            [ viewIconLabeled LightButtonStyle "favorite_border" "9"
-            , viewIconLabeled LightButtonStyle "chat_bubble_outline" "12"
-            ]
+
+        -- , row None
+        --     [ spacing 30 ]
+        --     [ viewIconLabeled LightButtonStyle "favorite_border" "9"
+        --     , viewIconLabeled LightButtonStyle "chat_bubble_outline" "12"
+        --     ]
         ]
 
 
@@ -586,6 +618,7 @@ viewPostsList isAuthorized posts =
             ]
 
 
+viewNothingFound : Element Styles Variations Msg
 viewNothingFound =
     el None
         []
@@ -598,8 +631,7 @@ viewPostsListByTag isAuthorized tag posts =
         Just tag ->
             column None
                 [ spacing 10, center ]
-                [ --viewIconLabeled LightButtonStyle "label_outline" tag.name
-                  row None [ verticalCenter, spacing 20 ] [ text "All posts by label:", viewTag tag ]
+                [ row None [ verticalCenter, spacing 20 ] [ text "All posts by label:", viewTag tag ]
                 , viewPostsList isAuthorized posts
                 ]
 
@@ -626,9 +658,9 @@ viewTags tags =
 
 {-| Renders raw HTML of a prerendered Markdown
 -}
-viewPostBody : String -> Html.Html msg
+viewPostBody : String -> Element Styles Variations Msg
 viewPostBody body =
-    Html.div [ (Html.Attributes.property "innerHTML" (Encode.string body)) ] []
+    Html.div [ (Html.Attributes.property "innerHTML" (Encode.string body)) ] [] |> html
 
 
 
@@ -670,12 +702,13 @@ viewHeader isAuthorized currentRoute =
             [ justify ]
             [ row None
                 [ paddingTop 80, paddingBottom 80, spacing 40 ]
-                [ viewButtonText Logo [] "igor kuzmenko_" (ChangeRoute PostsListRoute)
+                [ viewButtonText Logo [ paddingXY 0 0 ] "igor kuzmenko_" (ChangeRoute PostsListRoute)
                 , row None
                     [ spacing 40 ]
                     [ navLink "blog" PostsListRoute
                     , navLink "projects" ProjectsListRoute
-                    , navLink "about" AboutRoute
+
+                    -- , navLink "about" AboutRoute
                     , when (isAuthorized == False) (navLink "login" LoginRoute)
                     ]
                     |> nav
