@@ -15,7 +15,7 @@ cache:
     - api/node_modules
     - sysconfcpus
 
-before_script:
+before_install:
   - npm i -g yarn
   - |
       if [ ! -d sysconfcpus/bin ]; then
@@ -26,8 +26,12 @@ before_script:
           cd ..;
       fi
 
+install:
+  - cd $TIER
+  - yarn install
+
 script:
-  - travis_wait "scripts/build_$TIER.sh $TRAVIS_BUILD_DIR $TIER; true"
+  - "scripts/build_$TIER.sh $TRAVIS_BUILD_DIR $TIER; true"
 
 addons:
   ssh_known_hosts: dev.kuzzmi.com
@@ -44,3 +48,7 @@ deploy:
   script: bash $TRAVIS_BUILD_DIR/scripts/deploy_$TIER.sh $TRAVIS_BUILD_DIR $TIER
   on:
     branch: dev
+
+after_deploy:
+  - ssh kuzzmi@dev.kuzzmi.com -i /tmp/deploy_rsa "/bin/bash -c \"source ~/.nvm/nvm.sh && pm2 restart all\""
+
