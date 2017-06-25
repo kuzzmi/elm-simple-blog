@@ -1,1 +1,1 @@
-npm i -g elm && cd $1/$2 && $1/sysconfcpus/bin/sysconfcpus -n 2; yarn build
+npm i -g elm && cd $1/$2 && ( while : ; do date; sleep 60; done ) & yarn build; kill %1
