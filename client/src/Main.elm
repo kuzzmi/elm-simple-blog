@@ -378,8 +378,8 @@ viewProjectsListItem : Bool -> Project -> Element Styles Variations Msg
 viewProjectsListItem isAuthorized project =
     column None
         [ spacing 5, width (percent 50) ]
-        [ image project.imageUrl None [] (text (project.name ++ " image"))
-        , el PostTitle [ vary Link True ] (text project.name) |> link project.url
+        [ -- image project.imageUrl None [] (text (project.name ++ " image")),
+          el PostTitle [ vary Link True ] (text project.name) |> link project.url
         , paragraph None [] [ text project.description ]
         , viewIconLabeled LightButtonStyle "favorite_border" (toString project.stars)
         ]
@@ -679,17 +679,7 @@ viewHeader isAuthorized currentRoute =
                     , when (isAuthorized == False) (navLink "login" LoginRoute)
                     ]
                     |> nav
-
-                -- , el NavOption [] (text "rss") |> link "http://feeds.feedburner.com/kuzzmi"
                 ]
-            , viewButtonIconText ButtonStyle "create" "a" (ChangeRoute PostsListRoute)
-                |> below
-                    [ el ButtonStyle [ width (px 40), height (px 40) ] empty
-                        |> below
-                            [ el ButtonStyle [ width (px 40), height (px 40) ] empty
-                                |> below [ el ButtonStyle [ width (px 40), height (px 40) ] empty ]
-                            ]
-                    ]
             ]
 
 
