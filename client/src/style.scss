@@ -1,12 +1,14 @@
-@import url("https://fonts.googleapis.com/css?family=Overpass+Mono:300,400,600,700");
+@import url('https://fonts.googleapis.com/css?family=Raleway:400,600,600i|Playfair+Display:400,700');
 
-* {
-    line-height: 2 !important;
-}
+// ---------------------------
+// ----- DISQUS THEME --------
 
 a {
     color: #FF8300;
 }
+
+// ---------------------------
+// ------- ADD TO ANY --------
 
 .a2a_default_style .a2a_count,
 .a2a_default_style .a2a_svg,
@@ -14,7 +16,7 @@ a {
 .a2a_vertical_style .a2a_count,
 .a2a_menu .a2a_svg {
     border-radius: 0 !important;
-    font-family: 'Overpass', monospace;
+    font-family: 'Raleway', monospace;
     font-weight: 500 !important;
     // line-height: 2 !important;
 }
@@ -46,14 +48,17 @@ a {
     pre code {
         margin: 10px 0;
         padding: 20px;
+        color: rgb(204, 204, 204);
+        background: rgb(57, 57, 57);
     }
 
     code {
         font-size: 14px;
         padding: 7px 10px;
+        margin: 0 5px;
         border-radius: 2px;
-        color: rgb(204, 204, 204);
-        background: rgb(57, 57, 57);
+        color: #5a5a5a;
+        background: #f1f1f1;
     }
 
 
@@ -75,7 +80,7 @@ a {
         list-style-type: decimal-leading-zero;
     }
 
-    h1, h2, h3, h4 {
+    h1, h2, h3, h4, h5, h6 {
         padding: 0;
         margin: 0;
         font-weight: 700;

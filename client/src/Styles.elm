@@ -10,7 +10,7 @@ import Color
 type Styles
     = None
     | Main
-    | PostTitle
+    | TitleStyle
     | Logo
     | NavOption
     | TagStyle
@@ -49,12 +49,15 @@ stylesheet =
     Style.stylesheet
         [ style None []
         , style Main
-            [ Font.typeface [ "Overpass", "monospace" ]
+            [ Font.typeface [ "Raleway", "sans-serif" ]
             , Font.lineHeight 2
             , Color.text darkGrey
+            , Color.background Color.white
             ]
-        , style PostTitle
-            [ Font.size 32
+        , style TitleStyle
+            [ Font.typeface [ "Playfair Display", "serif" ]
+            , Font.lineHeight 1.2
+            , Font.size 48
             , Font.weight 700
             , Color.text darkGrey
             , variation Link
@@ -65,7 +68,7 @@ stylesheet =
                 ]
             ]
         , style Logo
-            [ Font.size 26
+            [ Font.size 20
             , Font.weight 600
             , Color.text orange
             , Style.cursor "pointer"
@@ -74,7 +77,7 @@ stylesheet =
                 ]
             ]
         , style NavOption
-            [ Font.size 26
+            [ Font.size 16
             , Font.weight 600
             , Color.text darkGrey
             , Style.cursor "pointer"

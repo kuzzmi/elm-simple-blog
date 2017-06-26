@@ -283,10 +283,10 @@ view model =
     column None
         []
         [ column Main
-            [ center, width (px 900) ]
+            [ center, paddingXY 40 0, width (px 900) ]
             [ viewHeader (model.accessToken /= Nothing) model.currentRoute
             , column None
-                [ spacing 100 ]
+                [ spacing 100, width (percent 100) ]
                 (viewContent model)
             , viewFooter
             ]
@@ -373,7 +373,7 @@ viewLogin isAuthorized creds =
             [ spacing 30, width (px 900) ]
             [ column None
                 [ spacing 5 ]
-                [ paragraph PostTitle [] [ text "Login" ]
+                [ paragraph TitleStyle [ paddingBottom 20 ] [ text "Login" ]
                 ]
             , viewError creds.isError "Looks like credentials are not correct or there is another problem"
             , input TextInput [ onInput updateUsername ] "Username" creds.username
@@ -391,7 +391,7 @@ viewProjectsListItem isAuthorized project =
     column None
         [ spacing 5, width (percent 50) ]
         [ -- image project.imageUrl None [] (text (project.name ++ " image")),
-          el PostTitle [ vary Link True ] (text project.name) |> link project.url
+          el TitleStyle [ vary Link True, paddingBottom 20 ] (text project.name) |> link project.url
         , paragraph None [] [ text project.description ]
         , viewIconLabeled LabelStyle "grade" (toString project.stars)
         ]
@@ -427,9 +427,9 @@ viewPost isAuthorized post =
                     post
                     [ viewButtonText ButtonStyle [] "edit" (ChangeRoute <| PostEditRoute post.slug)
                     ]
-                , paragraph PostTitle [ vary Link False ] [ text post.title ]
+                , paragraph TitleStyle [ vary Link False, paddingBottom 20 ] [ text post.title ]
                 , el None
-                    [ width (px 900), class "post-body" ]
+                    [ class "post-body" ]
                     (viewPostBody post.body)
                 , viewTags post.tags
                 , when post.isPublished <| row None [ center, paddingXY 0 20 ] [ viewA2A ]
@@ -483,7 +483,7 @@ viewPostEdit isAuthorized post =
                             , when (String.length post.id > 0) (publishButton post)
                             , when (String.length post.id > 0) (viewButtonText ButtonStyle [] "delete" (PostDelete post))
                             ]
-                        , paragraph PostTitle [] [ text "Edit Post" ]
+                        , paragraph TitleStyle [ paddingBottom 20 ] [ text "Edit Post" ]
                         ]
                     , input TextInput [ onInput (UpdatePostTitle post) ] "Title" post.title
                     , input TextAreaInput [ onInput (UpdatePostDescription post) ] "Description" post.description
@@ -495,9 +495,7 @@ viewPostEdit isAuthorized post =
                     ]
 
             Nothing ->
-                column None
-                    [ spacing 10 ]
-                    [ paragraph PostTitle [] [ text "Nothing found" ] ]
+                viewNothingFound
 
 
 viewPostStatus : Bool -> Element Styles Variations Msg
@@ -571,7 +569,11 @@ viewPostMeta isAuthorized post buttons =
         [ row None
             [ spacing 30 ]
             [ viewPostStatus post.isPublished
-            , el None [] (Date.toFormattedString "MMMM ddd, y" post.dateCreated |> text)
+            , row None
+                [ spacing 10 ]
+                [ text "Published on"
+                , Date.toFormattedString "MMMM ddd, y" post.dateCreated |> text
+                ]
             ]
         , viewButtonsRow isAuthorized buttons
         ]
@@ -589,7 +591,7 @@ viewPostsListItem isAuthorized post =
             post
             [ viewButtonText ButtonStyle [] "edit" (ChangeRoute <| PostEditRoute post.slug)
             ]
-        , viewClickable PostTitle [ vary Link True ] (ChangeRoute <| PostViewRoute post.slug) (text post.title)
+        , viewClickable TitleStyle [ paddingBottom 20, vary Link True ] (ChangeRoute <| PostViewRoute post.slug) (text post.title)
         , paragraph None [ paddingBottom 10 ] [ text post.description ]
         , viewTags post.tags
 
@@ -622,7 +624,7 @@ viewNothingFound : Element Styles Variations Msg
 viewNothingFound =
     el None
         []
-        (paragraph PostTitle [] [ text "Nothing found" ])
+        (paragraph TitleStyle [ paddingBottom 20 ] [ text "Nothing found" ])
 
 
 viewPostsListByTag : Bool -> Maybe Tag -> List Post -> Element Styles Variations Msg
@@ -630,8 +632,8 @@ viewPostsListByTag isAuthorized tag posts =
     case tag of
         Just tag ->
             column None
-                [ spacing 10, center ]
-                [ row None [ verticalCenter, spacing 20 ] [ text "All posts by label:", viewTag tag ]
+                [ spacing 10 ]
+                [ row LabelStyle [ verticalCenter, spacing 20, paddingBottom 20 ] [ text "All posts by label:", viewTag tag ]
                 , viewPostsList isAuthorized posts
                 ]
 
@@ -696,15 +698,21 @@ viewHeader isAuthorized currentRoute =
             Routing.isRouteActive currentRoute route
 
         navLink label route =
-            viewButtonText NavOption [ vary Active (isActive route), paddingXY 15 0 ] label (ChangeRoute route)
+            viewButtonText NavOption
+                [ verticalCenter
+                , vary Active (isActive route)
+                , paddingXY 10 0
+                ]
+                label
+                (ChangeRoute route)
     in
         row None
             [ justify ]
             [ row None
-                [ paddingTop 80, paddingBottom 80, spacing 40 ]
-                [ viewButtonText Logo [ paddingXY 0 0 ] "igor kuzmenko_" (ChangeRoute PostsListRoute)
+                [ verticalCenter, paddingXY 0 40, spacing 40 ]
+                [ viewButtonText Logo [ paddingXY 0 0 ] "kuzzmi_" (ChangeRoute PostsListRoute)
                 , row None
-                    [ spacing 40 ]
+                    [ spacing 20 ]
                     [ navLink "blog" PostsListRoute
                     , navLink "projects" ProjectsListRoute
 
@@ -720,7 +728,7 @@ viewFooter : Element Styles variation msg
 viewFooter =
     el None [] <|
         row Footer
-            [ paddingTop 80, paddingBottom 80 ]
+            [ paddingXY 0 80 ]
             [ row None
                 [ spacing 10 ]
                 [ el None [] (text "Built with")
