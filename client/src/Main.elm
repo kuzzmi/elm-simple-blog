@@ -709,7 +709,7 @@ viewHeader isAuthorized currentRoute =
                     , navLink "projects" ProjectsListRoute
 
                     -- , navLink "about" AboutRoute
-                    , when (isAuthorized == False) (navLink "login" LoginRoute)
+                    -- , when (isAuthorized == False) (navLink "login" LoginRoute)
                     ]
                     |> nav
                 ]
