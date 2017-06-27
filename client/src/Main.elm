@@ -18,6 +18,7 @@ import Models exposing (..)
 import Routing
 import Api
 import Msg exposing (..)
+import Window exposing (Size, size, resizes)
 import Color
 
 
@@ -94,12 +95,14 @@ init flags location =
           , accessToken = flags.accessToken
           , apiUrl = flags.apiUrl
           , currentRoute = Nothing
+          , device = Device 0 0 False False False False False
           }
         , Cmd.batch
             [ Api.getPosts requester
             , Api.getTags requester
             , Api.getProjects requester
             , navigateTo route
+            , Task.perform WindowResize Window.size
             ]
         )
 
@@ -260,6 +263,13 @@ update msg model =
                 in
                     ( { model | creds = newCreds model.creds }, Cmd.none )
 
+            WindowResize size ->
+                let
+                    device =
+                        classifyDevice size
+                in
+                    ( { model | device = device }, Cmd.none )
+
             DoNothing _ ->
                 ( model, Cmd.none )
 
@@ -280,18 +290,32 @@ isAuthorized token =
 
 view : Model -> Html.Html Msg
 view model =
-    column None
-        []
-        [ column Main
-            [ center, paddingXY 40 0, width (px 900) ]
-            [ viewHeader (model.accessToken /= Nothing) model.currentRoute
-            , column None
-                [ spacing 100, width (percent 100) ]
-                (viewContent model)
-            , viewFooter
+    let
+        pageWidth =
+            if (model.device.phone || model.device.tablet) then
+                100
+            else
+                60
+
+        pagePadding =
+            if (model.device.phone || model.device.tablet) then
+                10
+            else
+                40
+    in
+        column None
+            []
+            [ column Main
+                [ center, paddingXY pagePadding 0, width (percent pageWidth) ]
+                [ viewHeader (model.accessToken /= Nothing) model.currentRoute
+                , el LabelStyle [] (model.device.width |> toString |> text)
+                , column None
+                    [ spacing 100, width (percent 100) ]
+                    (viewContent model)
+                , viewFooter
+                ]
             ]
-        ]
-        |> Element.root stylesheet
+            |> Element.viewport stylesheet
 
 
 getPostBySlug : String -> List Post -> Maybe Post
@@ -745,4 +769,4 @@ viewFooter =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Sub.none
+    Sub.batch [ resizes WindowResize ]

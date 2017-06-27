@@ -1,6 +1,7 @@
 module Models exposing (..)
 
 import Date
+import Element exposing (Device)
 
 
 type Route
@@ -27,6 +28,7 @@ type alias Model =
     , accessToken : Token
     , apiUrl : String
     , currentRoute : Maybe Route
+    , device : Device
     }
 
 

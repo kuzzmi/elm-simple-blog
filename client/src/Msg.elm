@@ -3,6 +3,7 @@ module Msg exposing (Msg(..))
 import Models exposing (..)
 import Http
 import Navigation exposing (Location)
+import Window exposing (Size)
 
 
 type Msg
@@ -29,4 +30,5 @@ type Msg
     | ChangeRoute Route
     | UrlChange Location
       -- misc
+    | WindowResize Size
     | DoNothing String
