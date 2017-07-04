@@ -299,7 +299,7 @@ view model =
 
         pagePadding =
             if (model.device.phone || model.device.tablet) then
-                10
+                20
             else
                 40
     in
@@ -307,8 +307,7 @@ view model =
             []
             [ column Main
                 [ center, paddingXY pagePadding 0, width (percent pageWidth) ]
-                [ viewHeader (model.accessToken /= Nothing) model.currentRoute
-                , el LabelStyle [] (model.device.width |> toString |> text)
+                [ viewHeader (model.accessToken /= Nothing) model.device model.currentRoute
                 , column None
                     [ spacing 100, width (percent 100) ]
                     (viewContent model)
@@ -433,7 +432,7 @@ viewProjectsList isAuthorized projects =
                 [ viewButtonText ButtonStyle [ paddingXY 10 0 ] "new project" (ChangeRoute PostNewRoute)
                 , viewButtonText ButtonStyle [ paddingXY 10 0 ] "sync projects" (ChangeRoute PostNewRoute)
                 ]
-            , wrappedRow None [ spacing 100 ] (List.map viewProjectsListItem_ projects)
+            , column None [ spacing 100 ] (List.map viewProjectsListItem_ projects)
             ]
 
 
@@ -715,9 +714,17 @@ viewAbout isAuthorized =
 -- MISC
 
 
-viewHeader : Bool -> Maybe Route -> Element Styles Variations Msg
-viewHeader isAuthorized currentRoute =
+viewHeader : Bool -> Device -> Maybe Route -> Element Styles Variations Msg
+viewHeader isAuthorized device currentRoute =
     let
+        headerPadding =
+            if (device.bigDesktop) then
+                40
+            else if (device.desktop) then
+                30
+            else
+                20
+
         isActive route =
             Routing.isRouteActive currentRoute route
 
@@ -733,12 +740,13 @@ viewHeader isAuthorized currentRoute =
         row None
             [ justify ]
             [ row None
-                [ verticalCenter, paddingXY 0 40, spacing 40 ]
+                [ verticalCenter, paddingXY 0 headerPadding, spacing 40 ]
                 [ viewButtonText Logo [ paddingXY 0 0 ] "kuzzmi_" (ChangeRoute PostsListRoute)
                 , row None
                     [ spacing 20 ]
                     [ navLink "blog" PostsListRoute
                     , navLink "projects" ProjectsListRoute
+                    , el LabelStyle [] (device.width |> toString |> text)
 
                     -- , navLink "about" AboutRoute
                     -- , when (isAuthorized == False) (navLink "login" LoginRoute)
